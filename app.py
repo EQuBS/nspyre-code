@@ -1,0 +1,95 @@
+#!/usr/bin/env python
+"""
+This is an example script that demonstrates the basic functionality of nspyre. 
+"""
+import logging
+from pathlib import Path
+
+import nspyre.gui.widgets.save
+import nspyre.gui.widgets.load
+import nspyre.gui.widgets.flex_line_plot
+import nspyre.gui.widgets.subsystem
+from nspyre import MainWidget
+from nspyre import MainWidgetItem
+from nspyre import nspyre_init_logger
+from nspyre import nspyreApp
+
+
+# in order for dynamic reloading of code to work, you must pass the specifc
+# module containing your class to MainWidgetItem, since the python reload()
+# function does not recursively reload modules
+import template.gui.elements
+from template.drivers.insmgr import MyInstrumentManager
+import template.gui.gui_SigVsTime
+import template.gui.gui_T1
+from template.gui.spin_measurements import SpinMeasurements
+#from spin_measurements import SpinMeasurements 
+import template.gui.gui_dlnsec
+from template.drivers.dlnsec import DLnsec
+from template.drivers.ps82 import PS82
+import template.gui.spin_measurements
+
+#print(template.gui.spin_measurements.__file__)
+
+#from nspyre import InstrumentGateway
+#gw = InstrumentGateway(port=42068)
+#laser_driver = gw.laser
+laser_driver = DLnsec('COM4')  # Change 'COM3' to the appropriate port for your system
+pulse_streamer_driver = PS82()
+
+
+_HERE = Path(__file__).parent
+
+def main():
+    # Log to the console as well as a file inside the logs folder.
+    nspyre_init_logger(
+        log_level=logging.INFO,
+        log_path=_HERE / '../logs',
+        log_path_level=logging.DEBUG,
+        prefix=Path(__file__).stem,
+        file_size=10_000_000,
+    )
+
+    with MyInstrumentManager() as insmgr:
+        # Create Qt application and apply nspyre visual settings.
+        app = nspyreApp()
+
+        # Create the GUI.
+        main_widget = MainWidget(
+            {
+                'ODMR': MainWidgetItem(template.gui.elements, 'ODMRWidget', stretch=(1, 1)),
+                'T1': MainWidgetItem(template.gui.gui_T1, 'T1Widget', stretch=(1, 1)),
+                'DLnsec': MainWidgetItem(template.gui.gui_dlnsec, 'DLnsecWidget', args=[laser_driver, pulse_streamer_driver], stretch=(1, 1)),
+                'I-t': MainWidgetItem(template.gui.gui_SigVsTime, 'SigVsTimeWidget', stretch=(1, 1)),
+                'Subsystems': MainWidgetItem(nspyre.gui.widgets.subsystem, 'SubsystemsWidget', args=[insmgr.subs.subsystems], stretch=(1, 1)),
+                'Plots': {
+                    'FlexLinePlotDemo': MainWidgetItem(
+                        template.gui.elements,
+                        'FlexLinePlotWidgetWithODMRDefaults',
+                        stretch=(100, 100),
+                    ),
+                    'FlexLinePlot': MainWidgetItem(
+                        nspyre.gui.widgets.flex_line_plot,
+                        'FlexLinePlotWidget',
+                        stretch=(100, 100),
+                    ),
+                    'FlexLinePlot_SigVSTime': MainWidgetItem(
+                        template.gui.gui_SigVsTime,
+                        'FlexLinePlotWidgetWithSigVsTime',
+                        stretch=(100, 100),
+                    ),
+                },
+                'Save': MainWidgetItem(nspyre.gui.widgets.save, 'SaveWidget', stretch=(1, 1)),
+                'Load': MainWidgetItem(nspyre.gui.widgets.load, 'LoadWidget', stretch=(1, 1)),
+            }
+        )
+        main_widget.show()
+
+        # Run the GUI event loop.
+        app.exec()
+
+
+# if using the nspyre ProcessRunner, the main code must be guarded with if __name__ == '__main__':
+# see https://docs.python.org/2/library/multiprocessing.html#windows
+if __name__ == '__main__':
+    main()
