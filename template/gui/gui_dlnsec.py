@@ -18,8 +18,8 @@ from nspyre import InstrumentGateway
 #gw = InstrumentGateway(port=42068)
 
 #laser_driver = gw.laser  # Change 'COM3' to the appropriate port for your system
-laser_driver = DLnsec()
-pulse_streamer_driver = PS82()
+laser_driver = DLnsec('COM3')
+pulse_streamer_driver = PS82() 
 print(type(laser_driver))
 class DLnsecWidget(QtWidgets.QWidget):
     """Qt widget for controlling DLnsec lasers."""
