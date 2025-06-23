@@ -1,4 +1,4 @@
-from pulsestreamer import PulseStreamer, Sequence
+from pulsestreamer import PulseStreamer, Sequence, OutputState
 import numpy as np
 import time
 from rpyc.utils.classic import obtain
@@ -147,6 +147,10 @@ class PS82():
             print('warning, ch_type must be "digi" or "analog" in "compress_pattern" function.')
 
         return new_pattern
+    
+    # Set the channel on ps for triggering the laser to be 1 
+    def laser_on(self):
+        return self.ps.constant(OutputState([self.channel_dict["laser"]], 0.0, 0.0))
     
     """
     The following function was copied from pulses.py as a test.

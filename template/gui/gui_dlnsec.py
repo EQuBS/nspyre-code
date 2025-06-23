@@ -16,11 +16,14 @@ from template.drivers.ps82 import PS82
 from nspyre import InstrumentGateway
 
 #gw = InstrumentGateway(port=42068)
+#laser_driver = gw.laser #.open()  # Change 'COM3' to the appropriate port for your system
+#laser_driver.open()
 
-#laser_driver = gw.laser  # Change 'COM3' to the appropriate port for your system
-laser_driver = DLnsec('COM3')
-pulse_streamer_driver = PS82() 
-print(type(laser_driver))
+#laser_driver = DLnsec('COM3')
+#laser_driver.open()  # Open the connection to the laser
+#pulse_streamer_driver = PS82() 
+#print(type(laser_driver))
+
 class DLnsecWidget(QtWidgets.QWidget):
     """Qt widget for controlling DLnsec lasers."""
     
@@ -91,7 +94,7 @@ class DLnsecWidget(QtWidgets.QWidget):
         def set_modulation(button):
             mode = self.modulation_dropdown.currentText()
             if mode == las_state_text:
-                self.laser.las_mode()
+                self.laser.cw_mode()
             elif mode == external_trigger_modulation_state_text:
                 self.laser.trig_mode()
             elif mode == internal_trigger_modulation_state_text:

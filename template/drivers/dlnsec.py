@@ -125,6 +125,11 @@ class DLnsec():
         self._send('EXT')
         _logger.info(f'Setting {self} to external trigger mode.')
 
+    def int_mode(self):
+        """Put the laser into internal trigger mode."""
+        self._send('INT')
+        _logger.info(f'Setting {self} to internal trigger mode.')
+
     def on(self):
         """Turn the output stage on."""
         self._send('*ON')

@@ -28,13 +28,24 @@ import template.gui.gui_dlnsec
 from template.drivers.dlnsec import DLnsec
 from template.drivers.ps82 import PS82
 import template.gui.spin_measurements
+import template.gui.gui_Nano
 
 #print(template.gui.spin_measurements.__file__)
 
-#from nspyre import InstrumentGateway
-#gw = InstrumentGateway(port=42068)
-#laser_driver = gw.laser
-laser_driver = DLnsec('COM4')  # Change 'COM3' to the appropriate port for your system
+from nspyre import InstrumentGateway
+
+import template.gui.test_Nano
+
+from MCL_Madlib_Wrapper import MCL_Nanodrive
+nano = MCL_Nanodrive()
+handle = nano.init_handle()
+
+# Pass widget
+#widget = NanoWidget(nano=nano, handle=handle)
+
+gw = InstrumentGateway(port=42068)
+laser_driver = gw.laser
+#laser_driver = DLnsec('COM4')  # Change 'COM3' to the appropriate port for your system
 pulse_streamer_driver = PS82()
 
 
@@ -62,6 +73,7 @@ def main():
                 'DLnsec': MainWidgetItem(template.gui.gui_dlnsec, 'DLnsecWidget', args=[laser_driver, pulse_streamer_driver], stretch=(1, 1)),
                 'I-t': MainWidgetItem(template.gui.gui_SigVsTime, 'SigVsTimeWidget', stretch=(1, 1)),
                 'Subsystems': MainWidgetItem(nspyre.gui.widgets.subsystem, 'SubsystemsWidget', args=[insmgr.subs.subsystems], stretch=(1, 1)),
+                'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano, handle], stretch=(1, 1)),
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(
                         template.gui.elements,
