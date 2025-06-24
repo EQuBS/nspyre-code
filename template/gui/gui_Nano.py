@@ -28,15 +28,18 @@ class NanoWidget(QtWidgets.QWidget):
         layout = QtWidgets.QGridLayout()
         layout_row = 0
 
+        # Following buttons are commented out because the Nano is always on when powered. 6/23/2025
+        """ 
         # Plus button to turn the Nano off
-        off_button = QtWidgets.QPushButton('+')
-        off_button.clicked.connect(lambda: self.nano.off())
-        layout.addWidget(off_button, layout_row, 0)
+        #off_button = QtWidgets.QPushButton('+')
+        #off_button.clicked.connect(lambda: self.nano.off())
+        #layout.addWidget(off_button, layout_row, 0)
 
         # Minus button to turn the Nano on
-        on_button = QtWidgets.QPushButton('-')
-        on_button.clicked.connect(lambda: self.nano.on())
-        layout.addWidget(on_button, layout_row, 1)
+        #on_button = QtWidgets.QPushButton('-')
+        #on_button.clicked.connect(lambda: self.nano.on())
+        #layout.addWidget(on_button, layout_row, 1)
+        """
 
         layout_row += 1
 

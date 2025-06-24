@@ -29,6 +29,7 @@ from template.drivers.dlnsec import DLnsec
 from template.drivers.ps82 import PS82
 import template.gui.spin_measurements
 import template.gui.gui_Nano
+import template.gui.gui_Scan
 
 #print(template.gui.spin_measurements.__file__)
 
@@ -74,6 +75,7 @@ def main():
                 'I-t': MainWidgetItem(template.gui.gui_SigVsTime, 'SigVsTimeWidget', stretch=(1, 1)),
                 'Subsystems': MainWidgetItem(nspyre.gui.widgets.subsystem, 'SubsystemsWidget', args=[insmgr.subs.subsystems], stretch=(1, 1)),
                 'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano, handle], stretch=(1, 1)),
+                'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, handle], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(
                         template.gui.elements,
