@@ -100,7 +100,7 @@ class tt20:
         end_channel: Channel that triggers the end of counting (optional, default: CHANNEL_UNUSED)
         n_values: Number of values stored (data buffer size) (default: 1000)
         """
-        cbm = self.tagger.CountBetweenMarkers(tagger, click_channel, begin_channel, end_channel, n_values)
+        cbm = self.tagger.CountBetweenMarkers(click_channel, begin_channel, end_channel, n_values)
         return cbm
 
     #frees the Time Tagger object
