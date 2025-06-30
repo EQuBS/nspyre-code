@@ -91,6 +91,18 @@ class tt20:
     def is_measurement_running(self, measurement_type):
         return measurement_type.isRunning()
     
+    #Counts between marked events, introd. 6/27/2025 by Rolando
+    def count_BM(self, click_channel, begin_channel, end_channel, n_values):
+        """
+        tagger: Time tagger object.
+        click_channel: Channel on which clicks are received, gated by begin_channel and end_channel.
+        begin_channel: Channel that triggers the beginning of counting and stepping to the next value.
+        end_channel: Channel that triggers the end of counting (optional, default: CHANNEL_UNUSED)
+        n_values: Number of values stored (data buffer size) (default: 1000)
+        """
+        cbm = self.tagger.CountBetweenMarkers(tagger, click_channel, begin_channel, end_channel, n_values)
+        return cbm
+
     #frees the Time Tagger object
     def free_time_tagger(self):
         tt.freeTimeTagger(self.tagger)

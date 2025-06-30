@@ -30,6 +30,7 @@ from template.drivers.ps82 import PS82
 import template.gui.spin_measurements
 import template.gui.gui_Nano
 import template.gui.gui_Scan
+from template.drivers.TimeTaggerDriver import tt20
 
 #print(template.gui.spin_measurements.__file__)
 
@@ -46,6 +47,7 @@ handle = nano.init_handle()
 
 gw = InstrumentGateway(port=42068)
 laser_driver = gw.laser
+tagger = gw.daq  # Time Tagger driver
 #laser_driver = DLnsec('COM4')  # Change 'COM3' to the appropriate port for your system
 pulse_streamer_driver = PS82()
 
@@ -75,7 +77,7 @@ def main():
                 'I-t': MainWidgetItem(template.gui.gui_SigVsTime, 'SigVsTimeWidget', stretch=(1, 1)),
                 'Subsystems': MainWidgetItem(nspyre.gui.widgets.subsystem, 'SubsystemsWidget', args=[insmgr.subs.subsystems], stretch=(1, 1)),
                 'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano, handle], stretch=(1, 1)),
-                'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, handle], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
+                'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, handle, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(
                         template.gui.elements,

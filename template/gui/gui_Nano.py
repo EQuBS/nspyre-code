@@ -212,5 +212,16 @@ class NanoWidget(QtWidgets.QWidget):
         layout.addWidget(minus_zbutton, layout_row, 3)
         minus_zbutton.setFixedSize(60, 30)
         #minus_button.clicked.connect(lambda: self.position_spinbox.setValue(self.position_spinbox.value() - 0.003))
-
+    
         self.setLayout(layout)
+    
+    def closeEvent(self, event):
+        try:
+            if hasattr(self.nano, 'dll') and hasattr(self, 'handle'):
+                self.nano.dll.MCL_ReleaseHandle(self.handle)
+                print("Nano-Drive handle released.")
+        except Exception as e:
+            print(f"Error releasing Nano-Drive handle: {e}")
+        super().closeEvent(event)
+    
+        
