@@ -77,36 +77,35 @@ class ScanWidget(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel(''), layout_row, 0)
         layout.addWidget(QtWidgets.QLabel('Min.'), layout_row, 1)
         layout.addWidget(QtWidgets.QLabel('Max.'), layout_row, 2)
-        layout.addWidget(QtWidgets.QLabel('N'), layout_row, 3)
+        layout.addWidget(QtWidgets.QLabel('Data Points'), layout_row, 3)
         layout_row += 1
         # Row 1: X position
         layout.addWidget(QtWidgets.QLabel('X'), layout_row, 0)
         self.x_min_box = QtWidgets.QDoubleSpinBox()
         self.x_max_box = QtWidgets.QDoubleSpinBox()
-        self.x_n_box = QtWidgets.QSpinBox()
+        self.data_points_box = QtWidgets.QSpinBox()
         self.x_min_box.setRange(0.000, 200.000)
         self.x_min_box.setDecimals(3)
         self.x_min_box.setSingleStep(0.003)
         self.x_max_box.setRange(0.000, 200.000)
         self.x_max_box.setDecimals(3)
         self.x_max_box.setSingleStep(0.003)
-        self.x_n_box.setRange(0, 10000)
+        self.data_points_box.setRange(0, 9999)
         layout.addWidget(self.x_min_box, layout_row, 1)
         layout.addWidget(self.x_max_box, layout_row, 2)
-        layout.addWidget(self.x_n_box, layout_row, 3)
+        layout.addWidget(self.data_points_box, layout_row, 3)
         layout_row += 1
         # Row 2: Y position
         layout.addWidget(QtWidgets.QLabel('Y'), layout_row, 0)
         self.y_min_box = QtWidgets.QDoubleSpinBox()
         self.y_max_box = QtWidgets.QDoubleSpinBox()
-        self.y_n_box = QtWidgets.QSpinBox()
         self.y_min_box.setRange(0.000, 200.000)
         self.y_min_box.setDecimals(3)
         self.y_min_box.setSingleStep(0.003)
         self.y_max_box.setRange(0.000, 200.000)
         self.y_max_box.setDecimals(3)
         self.y_max_box.setSingleStep(0.003)
-        self.y_n_box.setRange(0, 10000)
+        
         layout.addWidget(self.y_min_box, layout_row, 1)
         layout.addWidget(self.y_max_box, layout_row, 2)
         layout.addWidget(self.y_n_box, layout_row, 3)
@@ -115,14 +114,14 @@ class ScanWidget(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel('Z'), layout_row, 0)
         self.z_min_box = QtWidgets.QDoubleSpinBox()
         self.z_max_box = QtWidgets.QDoubleSpinBox()
-        self.z_n_box = QtWidgets.QSpinBox()
+        
         self.z_min_box.setRange(0.000, 200.000)
         self.z_min_box.setDecimals(3)
         self.z_min_box.setSingleStep(0.003)
         self.z_max_box.setRange(0.000, 200.000)
         self.z_max_box.setDecimals(3)
         self.z_max_box.setSingleStep(0.003)
-        self.z_n_box.setRange(0, 10000)
+        
         layout.addWidget(self.z_min_box, layout_row, 1)
         layout.addWidget(self.z_max_box, layout_row, 2)
         layout.addWidget(self.z_n_box, layout_row, 3)
@@ -145,7 +144,7 @@ class ScanWidget(QtWidgets.QWidget):
 
         # Waveform data
 
-        x_line_for = np.linspace(self.x_min_box.value(), self.x_max_box.value(), self.x_n_box.value())
+        x_line_for = np.linspace(self.x_min_box.value(), self.x_max_box.value(), self.data_points_box.value())
         x_line_bac = x_line_for[::-1] # X line backward      
         
 
@@ -177,10 +176,23 @@ class ScanWidget(QtWidgets.QWidget):
             x_wfm = [] # X waveform
             y_wfm = [] # Y waveform
             #z_wfm = [] # Z waveform
+
+            # Prevent invalid X range
+            if self.x_max_box.value() <= self.x_min_box.value():
+                QMessageBox.warning(self, "Invalid X Range", "X max must be greater than X min.")
+                return
+            
+            # Prevent invalid Y range
+            if self.y_max_box.value() <= self.y_min_box.value():
+                QMessageBox.warning(self, "Invalid Y Range", "Y max must be greater than Y min.")
+                return
+
             step_x = (self.x_max_box.value() - self.x_min_box.value()) / (self.x_n_box.value() - 1)
             if self.y_n_box.value() <= 1:
                 QMessageBox.warning(self, "Invalid Y N", "Number of Y points (N) must be greater than 1.")
                 return
+            
+            # Add ceiling function.
             step_y = (self.y_max_box.value() - self.y_min_box.value()) / (self.y_n_box.value() - 1)
             if step_y == 0:
                 QMessageBox.warning(self, "Invalid Y Range", "Y max and Y min must be different.")
