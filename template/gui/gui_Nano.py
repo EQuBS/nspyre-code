@@ -57,9 +57,9 @@ class NanoWidget(QtWidgets.QWidget):
             x = self.nano.single_read_n(1, self.handle)
             y = self.nano.single_read_n(2, self.handle)
             z = self.nano.single_read_n(3, self.handle)
-            self.x_pos_box.setText(f"{x:.4f}")
-            self.y_pos_box.setText(f"{y:.4f}")
-            self.z_pos_box.setText(f"{z:.4f}")
+            self.x_pos_box.setText(f"{-100+(x):.4f}")
+            self.y_pos_box.setText(f"{-100+(y):.4f}")
+            self.z_pos_box.setText(f"{-100+(z):.4f}")
         read_button.clicked.connect(read_position)
 
         # Add widgets to layout
@@ -81,7 +81,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # X position spinbox
         layout.addWidget(QtWidgets.QLabel('X-Position (um)'), layout_row, 0)
-        self.x_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
+        self.x_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-100.000, 100.000), step=0.003, dec=4, int=False)
         self.x_position_spinbox.setFixedSize(120, 30)
         self.x_position_spinbox.setValue(value=0)
         layout.addWidget(self.x_position_spinbox, layout_row, 1)
@@ -91,7 +91,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_xbutton = QtWidgets.QPushButton('Move')
         def move_x(button):
-            self.nano.monitor_n(self.x_position_spinbox.value(), 1, self.handle)
+            self.nano.monitor_n(100 + (self.x_position_spinbox.value()), 1, self.handle)
         move_xbutton.clicked.connect(move_x)
         layout.addWidget(move_xbutton, layout_row, 2)
 
@@ -127,7 +127,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # Y position spinbox
         layout.addWidget(QtWidgets.QLabel('Y-Position (um)'), layout_row, 0)
-        self.y_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
+        self.y_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-100.000, 100.000), step=0.003, dec=4, int=False)
         self.y_position_spinbox.setFixedSize(120, 30)
         self.y_position_spinbox.setValue(value=0)
         layout.addWidget(self.y_position_spinbox, layout_row, 1)
@@ -137,7 +137,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_ybutton = QtWidgets.QPushButton('Move')
         def move_y(button):
-            self.nano.monitor_n(self.y_position_spinbox.value(), 2, self.handle)
+            self.nano.monitor_n(100 + (self.y_position_spinbox.value()), 2, self.handle)
         move_ybutton.clicked.connect(move_y)
         layout.addWidget(move_ybutton, layout_row, 2)
 
@@ -172,7 +172,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # Z position spinbox
         layout.addWidget(QtWidgets.QLabel('Z-Position (um)'), layout_row, 0)
-        self.z_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
+        self.z_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-100.000, 100.000), step=0.003, dec=4, int=False)
         self.z_position_spinbox.setFixedSize(120, 30)
         self.z_position_spinbox.setValue(value=0)
         layout.addWidget(self.z_position_spinbox, layout_row, 1)
@@ -182,7 +182,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_zbutton = QtWidgets.QPushButton('Move')
         def move_z(button):
-            self.nano.monitor_n(self.z_position_spinbox.value(), 3, self.handle)
+            self.nano.monitor_n(100 + (self.z_position_spinbox.value()), 3, self.handle)
         move_zbutton.clicked.connect(move_z)
         layout.addWidget(move_zbutton, layout_row, 2)
 
@@ -212,7 +212,18 @@ class NanoWidget(QtWidgets.QWidget):
         layout.addWidget(minus_zbutton, layout_row, 3)
         minus_zbutton.setFixedSize(60, 30)
         #minus_button.clicked.connect(lambda: self.position_spinbox.setValue(self.position_spinbox.value() - 0.003))
-    
+
+        # Home button to set all axes to 100 um 
+        home_button = QtWidgets.QPushButton('Home')
+        def home_axes(button):
+            # Move all axes to 100 um (hardware)
+            self.nano.monitor_n(100.0, 1, self.handle)  # X
+            self.nano.monitor_n(100.0, 2, self.handle)  # Y
+            self.nano.monitor_n(100.0, 3, self.handle)  # Z
+        home_button.clicked.connect(home_axes)
+        layout.addWidget(home_button, layout_row, 0, 1, 2)  # Spans two columns for visibility
+        layout_row += 1
+
         self.setLayout(layout)
     
     def closeEvent(self, event):

@@ -94,14 +94,23 @@ class tt20:
     #Counts between marked events, introd. 6/27/2025 by Rolando
     def count_BM(self, click_channel, begin_channel, end_channel, n_values):
         """
-        tagger: Time tagger object.
+        Uses the TimeTagger CountBetweenMarkers measurement.
+
         click_channel: Channel on which clicks are received, gated by begin_channel and end_channel.
         begin_channel: Channel that triggers the beginning of counting and stepping to the next value.
-        end_channel: Channel that triggers the end of counting (optional, default: CHANNEL_UNUSED)
-        n_values: Number of values stored (data buffer size) (default: 1000)
+        end_channel: Channel that triggers the end of counting.
+        n_values: Number of values stored (data buffer size).
+        
+        Returns: The data from CountBetweenMarkers after measurement.
         """
-        cbm = self.tagger.CountBetweenMarkers(click_channel, begin_channel, end_channel, n_values)
-        return cbm
+        try:
+            cbm = tt.CountBetweenMarkers(self.tagger, click_channel, begin_channel, end_channel, n_values)
+            cbm.start()
+            cbm.waitUntilFinished()
+            data = cbm.getData()
+            return data
+        except AttributeError:
+            raise AttributeError("Your TimeTagger module does not have CountBetweenMarkers. Please check your TimeTagger version.")
 
     #frees the Time Tagger object
     def free_time_tagger(self):
