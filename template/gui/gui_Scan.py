@@ -41,19 +41,28 @@ INSTRUMENTS:
 class ScanWidget(QtWidgets.QWidget):
     """Qt widget for controlling a scanning procedure."""
 
-    def __init__(self, nano, handle, laser_driver, pulse_streamer_driver, tagger):
+    def __init__(self, nano, laser_driver, pulse_streamer_driver, tagger):
         """
         Args:
             nano: The MCL Nanodrive driver.
-            handle: The handle for the MCL Nanodrive.
+                - handle: The handle for the MCL Nanodrive. Handle is obtained during initialization. See MCL_Madlib_Wrapper.py code line 49 for more details.
             laser: The DLnsec laser driver.
             streamer: The Swabian Pulse Streamer driver.
             tagger: The Swabian Time Tagger driver.
 
         """
         super().__init__(parent=None)
-        self.nano = nano
-        self.handle = handle
+        try:
+            if nano is None:
+                self.nano = nano
+            else:
+                self.nano = nano
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "MCL Error", f"MCL Nanodrive not initialized: {e}\nScan functionality will be disabled.")
+            self.setDisabled(True)
+            return
+        #self.nano = nano
+        #self.handle = handle
         self.laser_driver = laser_driver
         self.pulse_streamer_driver = pulse_streamer_driver
         self.tagger = tagger
@@ -253,15 +262,15 @@ class ScanWidget(QtWidgets.QWidget):
                 y_wfm = np.array(y_wfm, dtype=np.float64)
                 #data_points = len(x_wfm) + len(y_wfm)
                 
-                duration = 2 # Time in milliseconds between data points (from 0.1ms to 5ms)
+                duration = 0.1 # Time in milliseconds between data points (from 0.1ms to 5ms)
                 iter = 1 # Number of iterations for the waveform. We can add a SpinBox to change this value in the future.
-                self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.handle)
+                self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
                 print(x_wfm)
-                self.nano.iss_bind_clock_to_axis(1 , 2, 6, self.handle)  # Bind clock to Waveform Write 
-                self.nano.wfma_trigger(self.handle)
+                self.nano.iss_bind_clock_to_axis(1 , 2, 6, self.nano.handle)  # Bind clock to Waveform Write 
+                self.nano.wfma_trigger(self.nano.handle)
 
                 #self.tagger.start_countrate([4], duration * 1000)  # Start countrate measurement on channel 4  
-                self.tagger.start_counter([4], duration, data_points, data_points*duration)
+                self.tagger.start_counter([4], 1e8, data_points, data_points*1e8)
                 
                 # We create a measurment object for intensity scanning.
                 pix_start_ch = 4 # Rising edge on input channel 4
@@ -353,8 +362,8 @@ class ScanWidget(QtWidgets.QWidget):
 
     def closeEvent(self, event):
         try:
-            if hasattr(self.nano, 'dll') and hasattr(self, 'handle'):
-                self.nano.dll.MCL_ReleaseHandle(self.handle)
+            if hasattr(self.nano, 'dll') and hasattr(self.nano, 'handle'):
+                self.nano.dll.MCL_ReleaseHandle(self.nano.handle)
                 print("Nano-Drive handle released.")
         except Exception as e:
             print(f"Error releasing Nano-Drive handle: {e}")

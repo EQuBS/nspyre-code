@@ -11,18 +11,19 @@ import time
 class NanoWidget(QtWidgets.QWidget):
     """Qt widget for controlling the Nano-3D200FT from MadCity Labs."""
 
-    def __init__(self, nano=None, handle=None):
+    def __init__(self, nano): #, nano=None, handle=None
         """
         Args:
             nano_driver: The MCL Nanodrive driver.
         """
         super().__init__()
-        if nano is None or handle is None:
+        self.nano = nano
+        """ if nano is None or handle is None:
             self.nano = MCL_Nanodrive()
             self.handle = self.nano.init_handle()
         else:
             self.nano = nano
-            self.handle = handle
+            self.handle = handle """
 
         # top level layout
         layout = QtWidgets.QGridLayout()
@@ -54,9 +55,9 @@ class NanoWidget(QtWidgets.QWidget):
         # Button to read the current position
         read_button = QtWidgets.QPushButton('Read Position')
         def read_position(button):
-            x = self.nano.single_read_n(1, self.handle)
-            y = self.nano.single_read_n(2, self.handle)
-            z = self.nano.single_read_n(3, self.handle)
+            x = self.nano.single_read_n(1, self.nano.handle)
+            y = self.nano.single_read_n(2, self.nano.handle)
+            z = self.nano.single_read_n(3, self.nano.handle)
             self.x_pos_box.setText(f"{-100+(x):.4f}")
             self.y_pos_box.setText(f"{-100+(y):.4f}")
             self.z_pos_box.setText(f"{-100+(z):.4f}")
@@ -91,7 +92,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_xbutton = QtWidgets.QPushButton('Move')
         def move_x(button):
-            self.nano.monitor_n(100 + (self.x_position_spinbox.value()), 1, self.handle)
+            self.nano.monitor_n(100 + (self.x_position_spinbox.value()), 1, self.nano.handle)
         move_xbutton.clicked.connect(move_x)
         layout.addWidget(move_xbutton, layout_row, 2)
 
@@ -106,8 +107,8 @@ class NanoWidget(QtWidgets.QWidget):
  
         plus_xbutton = QtWidgets.QPushButton('+')
         def plus_x(button):
-            read_x = self.nano.single_read_n(1, self.handle)
-            self.nano.monitor_n(read_x + self.x_step_size_spinbox.value(), 1, self.handle)
+            read_x = self.nano.single_read_n(1, self.nano.handle)
+            self.nano.monitor_n(read_x + self.x_step_size_spinbox.value(), 1, self.nano.handle)
         plus_xbutton.clicked.connect(plus_x)
         layout.addWidget(plus_xbutton, layout_row, 2)
         plus_xbutton.setFixedSize(60, 30)
@@ -115,8 +116,8 @@ class NanoWidget(QtWidgets.QWidget):
 
         minus_xbutton = QtWidgets.QPushButton('-')
         def minus_x(button):
-            read_x = self.nano.single_read_n(1, self.handle)
-            self.nano.monitor_n(read_x - self.x_step_size_spinbox.value(), 1, self.handle)
+            read_x = self.nano.single_read_n(1, self.nano.handle)
+            self.nano.monitor_n(read_x - self.x_step_size_spinbox.value(), 1, self.nano.handle)
         minus_xbutton.clicked.connect(minus_x)
         layout.addWidget(minus_xbutton, layout_row, 3)
         minus_xbutton.setFixedSize(60, 30)
@@ -137,7 +138,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_ybutton = QtWidgets.QPushButton('Move')
         def move_y(button):
-            self.nano.monitor_n(100 + (self.y_position_spinbox.value()), 2, self.handle)
+            self.nano.monitor_n(100 + (self.y_position_spinbox.value()), 2, self.nano.handle)
         move_ybutton.clicked.connect(move_y)
         layout.addWidget(move_ybutton, layout_row, 2)
 
@@ -152,8 +153,8 @@ class NanoWidget(QtWidgets.QWidget):
 
         plus_ybutton = QtWidgets.QPushButton('+')
         def plus_y(button):
-            read_y = self.nano.single_read_n(2, self.handle)
-            self.nano.monitor_n(read_y + self.y_step_size_spinbox.value(), 2, self.handle)
+            read_y = self.nano.single_read_n(2, self.nano.handle)
+            self.nano.monitor_n(read_y + self.y_step_size_spinbox.value(), 2, self.nano.handle)
         plus_ybutton.clicked.connect(plus_y)
         layout.addWidget(plus_ybutton, layout_row, 2)
         plus_ybutton.setFixedSize(60, 30)
@@ -161,8 +162,8 @@ class NanoWidget(QtWidgets.QWidget):
 
         minus_ybutton = QtWidgets.QPushButton('-')
         def minus_y(button):
-            read_y = self.nano.single_read_n(2, self.handle)
-            self.nano.monitor_n(read_y - self.y_step_size_spinbox.value(), 2, self.handle)
+            read_y = self.nano.single_read_n(2, self.nano.handle)
+            self.nano.monitor_n(read_y - self.y_step_size_spinbox.value(), 2, self.nano.handle)
         minus_ybutton.clicked.connect(minus_y)
         layout.addWidget(minus_ybutton, layout_row, 3)
         minus_ybutton.setFixedSize(60, 30)
@@ -182,7 +183,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_zbutton = QtWidgets.QPushButton('Move')
         def move_z(button):
-            self.nano.monitor_n(100 + (self.z_position_spinbox.value()), 3, self.handle)
+            self.nano.monitor_n(100 + (self.z_position_spinbox.value()), 3, self.nano.handle)
         move_zbutton.clicked.connect(move_z)
         layout.addWidget(move_zbutton, layout_row, 2)
 
@@ -197,8 +198,8 @@ class NanoWidget(QtWidgets.QWidget):
 
         plus_zbutton = QtWidgets.QPushButton('+')
         def plus_z(button):
-            read_z = self.nano.single_read_n(3, self.handle)
-            self.nano.monitor_n(read_z + self.z_step_size_spinbox.value(), 3, self.handle)
+            read_z = self.nano.single_read_n(3, self.nano.handle)
+            self.nano.monitor_n(read_z + self.z_step_size_spinbox.value(), 3, self.nano.handle)
         plus_zbutton.clicked.connect(plus_z)
         layout.addWidget(plus_zbutton, layout_row, 2)
         plus_zbutton.setFixedSize(60, 30)
@@ -206,8 +207,8 @@ class NanoWidget(QtWidgets.QWidget):
 
         minus_zbutton = QtWidgets.QPushButton('-')
         def minus_z(button):
-            read_z = self.nano.single_read_n(3, self.handle)
-            self.nano.monitor_n(read_z - self.z_step_size_spinbox.value(), 3, self.handle)
+            read_z = self.nano.single_read_n(3, self.nano.handle)
+            self.nano.monitor_n(read_z - self.z_step_size_spinbox.value(), 3, self.nano.handle)
         minus_zbutton.clicked.connect(minus_z)
         layout.addWidget(minus_zbutton, layout_row, 3)
         minus_zbutton.setFixedSize(60, 30)
@@ -217,9 +218,9 @@ class NanoWidget(QtWidgets.QWidget):
         home_button = QtWidgets.QPushButton('Home')
         def home_axes(button):
             # Move all axes to 100 um (hardware)
-            self.nano.monitor_n(100.0, 1, self.handle)  # X
-            self.nano.monitor_n(100.0, 2, self.handle)  # Y
-            self.nano.monitor_n(100.0, 3, self.handle)  # Z
+            self.nano.monitor_n(100.0, 1, self.nano.handle)  # X
+            self.nano.monitor_n(100.0, 2, self.nano.handle)  # Y
+            self.nano.monitor_n(100.0, 3, self.nano.handle)  # Z
         home_button.clicked.connect(home_axes)
         layout.addWidget(home_button, layout_row, 0, 1, 2)  # Spans two columns for visibility
         layout_row += 1
@@ -228,8 +229,8 @@ class NanoWidget(QtWidgets.QWidget):
     
     def closeEvent(self, event):
         try:
-            if hasattr(self.nano, 'dll') and hasattr(self, 'handle'):
-                self.nano.dll.MCL_ReleaseHandle(self.handle)
+            if hasattr(self.nano, 'dll') and hasattr(self.nano, 'handle'):
+                self.nano.dll.MCL_ReleaseHandle(self.nano.handle)
                 print("Nano-Drive handle released.")
         except Exception as e:
             print(f"Error releasing Nano-Drive handle: {e}")

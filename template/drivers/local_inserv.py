@@ -37,7 +37,7 @@ with InstrumentServer() as inserv, InstrumentGateway(port=42068) as gw:
     #gw.laser.open() #Added by Rolando, to open the connection when the class is instantiated.
     inserv.add('ps', _HERE / 'ps82.py', 'PS82') # inserv.add('ps', _HERE / 'ps82.py', 'PS82', args=['169.254.8.2']); inserv.add('ps', "C:\\Users\\XieLab\\Documents\\Confocal_System\\Drive_template-main\\template-main\\src\\template\\driversTX\\pulses.py", 'Pulses')
     inserv.add('daq', _HERE / 'TimeTaggerDriver.py', 'tt20')
-    #inserv.add('nano', _HERE / 'nano_driver.py', 'NanoDriver', args=['COM4']) # Rolando: Commented out to avoid conflict with GUI_Nano.py 6/12/2025
+    inserv.add('nano', _HERE / 'MCL_Madlib_Wrapper.py', 'MCL_Nanodrive') # Rolando added this 7/3/2025
     # run a CLI (command-line interface) that allows the user to enter
     # commands to control the server
     serve_instrument_server_cli(inserv)

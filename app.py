@@ -39,14 +39,25 @@ from nspyre import InstrumentGateway
 import template.gui.test_Nano
 
 from MCL_Madlib_Wrapper import MCL_Nanodrive
-nano = MCL_Nanodrive()
-handle = nano.init_handle()
+""" def get_nano_handle():
+    try:
+        nano = MCL_Nanodrive()
+        handle = nano.init_handle()
+        return nano, handle
+    except Exception as e:
+        print(f"Error initializing MCL Nanodrive: {e}")
+        return None, None """
+
+"""Pass the nano and handle with the use of InstrumentGateway.
+Rolando 7/2/2025
+"""
 
 # Pass widget
 #widget = NanoWidget(nano=nano, handle=handle)
 
 gw = InstrumentGateway(port=42068)
 laser_driver = gw.laser
+nano = gw.nano  # This is the proxy to your NanoDriver or MCL_Nanodrive on the instrument server
 tagger = gw.daq  # Time Tagger driver
 #laser_driver = DLnsec('COM4')  # Change 'COM3' to the appropriate port for your system
 pulse_streamer_driver = PS82()
@@ -76,8 +87,8 @@ def main():
                 'DLnsec': MainWidgetItem(template.gui.gui_dlnsec, 'DLnsecWidget', args=[laser_driver, pulse_streamer_driver], stretch=(1, 1)),
                 'I-t': MainWidgetItem(template.gui.gui_SigVsTime, 'SigVsTimeWidget', stretch=(1, 1)),
                 'Subsystems': MainWidgetItem(nspyre.gui.widgets.subsystem, 'SubsystemsWidget', args=[insmgr.subs.subsystems], stretch=(1, 1)),
-                'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano, handle], stretch=(1, 1)),
-                'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, handle, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
+                'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano], stretch=(1, 1)),
+                'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(
                         template.gui.elements,
