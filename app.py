@@ -60,8 +60,8 @@ laser_driver = gw.laser
 nano = gw.nano  # This is the proxy to your NanoDriver or MCL_Nanodrive on the instrument server
 tagger = gw.daq  # Time Tagger driver
 #laser_driver = DLnsec('COM4')  # Change 'COM3' to the appropriate port for your system
-pulse_streamer_driver = PS82()
-
+pulse_streamer_driver = gw.ps  #PS82() commented out by Rolando 7/2/2025, test InstrumentGateway is now used.
+#pulse_streamer_driver = PS82()
 
 _HERE = Path(__file__).parent
 

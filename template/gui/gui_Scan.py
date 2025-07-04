@@ -64,7 +64,7 @@ class ScanWidget(QtWidgets.QWidget):
         #self.nano = nano
         #self.handle = handle
         self.laser_driver = laser_driver
-        self.pulse_streamer_driver = pulse_streamer_driver
+        self.ps = pulse_streamer_driver
         self.tagger = tagger
 
         # Following block removed for the intro of more than one instrument in the ScanWidget.
@@ -262,7 +262,7 @@ class ScanWidget(QtWidgets.QWidget):
                 y_wfm = np.array(y_wfm, dtype=np.float64)
                 #data_points = len(x_wfm) + len(y_wfm)
                 
-                duration = 0.1 # Time in milliseconds between data points (from 0.1ms to 5ms)
+                duration = 5 # Time in milliseconds between data points (from 0.1ms to 5ms)
                 iter = 1 # Number of iterations for the waveform. We can add a SpinBox to change this value in the future.
                 self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
                 print(x_wfm)
@@ -312,6 +312,19 @@ class ScanWidget(QtWidgets.QWidget):
         
         # Add stretch to keep widgets at the top
         
+        # Gate (SPCM) on button
+        gate_on_button = QtWidgets.QPushButton('Gate On')
+        gate_on_button.clicked.connect(lambda: self.ps.gate_on())
+        layout.addWidget(gate_on_button, layout_row, 1)
+        # Gate (SPCM) off button
+        gate_off_button = QtWidgets.QPushButton('Gate Off')
+        gate_off_button.clicked.connect(lambda: self.ps.gate_off())
+        layout.addWidget(gate_off_button, layout_row, 2)
+        # Laser trigger button
+        gate_off_button = QtWidgets.QPushButton('Laser Trigger')
+        gate_off_button.clicked.connect(lambda: self.ps.laser_on())
+        layout.addWidget(gate_off_button, layout_row, 3)
+
         self.setLayout(layout)
         #layout.setRowStretch(layout_row, 1)
         
@@ -357,6 +370,7 @@ class ScanWidget(QtWidgets.QWidget):
             plot_widget.show()
 
         layout_row += 1
+
 
         
 

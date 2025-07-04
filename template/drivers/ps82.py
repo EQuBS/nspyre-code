@@ -12,7 +12,7 @@ class PS82():
         units in [ns].
         - Rolando
         """
-        self.channel_dict = {"clock": 0, "laser": 7, "switch": 2, "":3, "": 4, "": 5, "": 6, "": 1, "": None} # Change done by Rolando in PS channel dictionary.
+        self.channel_dict = {"clock": 0, "laser": 7, "switch": 2, "gate":3, "": 4, "": 5, "": 6, "": 1, "": None} # Change done by Rolando in PS channel dictionary.
         self.clock_time = 10
         self.sampling_time = 50000
         ip="169.254.8.2"
@@ -151,7 +151,13 @@ class PS82():
     # Set the channel on ps for triggering the laser to be 1 
     def laser_on(self):
         return self.ps.constant(OutputState([self.channel_dict["laser"]], 0.0, 0.0))
-    
+
+    def gate_on(self):
+        return self.ps.constant(OutputState([self.channel_dict["gate"]], 0.0, 0.0))
+
+    def gate_off(self):
+        return self.ps.constant(OutputState([], 0.0, 0.0))
+
     """
     The following function was copied from pulses.py as a test.
     - Rolando
