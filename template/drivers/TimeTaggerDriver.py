@@ -112,6 +112,9 @@ class tt20:
         except AttributeError:
             raise AttributeError("Your TimeTagger module does not have CountBetweenMarkers. Please check your TimeTagger version.")
 
+
+    #def get_Index(self)
+        
     #frees the Time Tagger object
     def free_time_tagger(self):
         tt.freeTimeTagger(self.tagger)

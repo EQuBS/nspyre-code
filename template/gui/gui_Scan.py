@@ -20,7 +20,7 @@ from nspyre import DataSource
 from nspyre import StreamingList
 from nspyre import DataSink, FlexLinePlotWidget
 import numpy as np
-
+import time
 
 sys.path.append('../experiments')
 
@@ -145,7 +145,7 @@ class ScanWidget(QtWidgets.QWidget):
         self.y_max_box.setRange(2.000, 200.000)
         self.y_max_box.setDecimals(3)
         self.y_max_box.setSingleStep(0.003)
-        self.data_points_y.setRange(2, 70)
+        self.data_points_y.setRange(2, 70) #
         layout.addWidget(self.y_min_box, layout_row, 1)
         layout.addWidget(self.y_max_box, layout_row, 2)
         layout.addWidget(self.data_points_y, layout_row, 3)
@@ -232,22 +232,120 @@ class ScanWidget(QtWidgets.QWidget):
         def scan_xy():
 
             with DataSource('Scan_data') as scan_data:
+                
+                # Updated by Rolando 7/7/2025
 
-                x_wfm = [] # X waveform
-                y_wfm = [] # Y waveform
-                #z_wfm = [] # Z waveform
+                # Axis config. from GUI
+                x_min = self.x_min_box.value()
+                x_max = self.x_max_box.value()
+                y_min = self.y_min_box.value()
+                y_max = self.y_max_box.value()
+                nx_pix = self.data_points_x.value()
+                ny_pix = self.data_points_y.value()
 
-                # Prevent invalid X range
-                if self.x_max_box.value() <= self.x_min_box.value():
+                # Range validation
+                if x_max <= x_min:
                     QMessageBox.warning(self, "Invalid X Range", "X max must be greater than X min.")
                     return
             
                 # Prevent invalid Y range
-                if self.y_max_box.value() <= self.y_min_box.value():
+                if y_max <= y_min:
                     QMessageBox.warning(self, "Invalid Y Range", "Y max must be greater than Y min.")
                     return
+                
+                # Position arrays
+                x_line_for = np.linspace(x_min, x_max, nx_pix)
+                x_line_bac = x_line_for[::-1]  # Reverse the X line for backward sweep
+                y_vals = np.linspace(y_min, y_max, ny_pix)
 
-        
+                x_wfm = [] # X waveform
+                y_wfm = [] # Y waveform
+
+                for i, y_pos in enumerate(y_vals):
+                    if i % 2 == 0:
+                        x_wfm.extend(x_line_for)
+                    else:
+                        x_wfm.extend(x_line_bac)
+                    y_wfm.extend([y_pos] * nx_pix)  # Repeat Y
+
+                x_wfm = np.array(x_wfm, dtype=np.float64)
+                y_wfm = np.array(y_wfm, dtype=np.float64)
+                data_points = len(x_wfm) # Number of data points in the x-waveform
+
+                # Timing and iteration
+                duration = 1  # Time in milliseconds between data points (from 0.1ms to 5ms)
+                iter = 1  # Number of iterations for the waveform. We can add a SpinBox to change this value in the future.
+
+                # Send waveform to the MCL Nanodrive
+                self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
+                self.nano.iss_bind_clock_to_axis(1, 2, 2, self.nano.handle)  # Bind clock to Waveform Write
+                self.nano.wfma_trigger(self.nano.handle)
+                print("Triggered scan with", data_points, "points.")
+
+                # Wait for a moment to allow TTL pulses to start
+                time.sleep(0.5)
+
+                # Start countrate on channels 3 (SPCM) and 4 (Pixel Clock)
+                self.tagger.start_countrate([3, 4], (nx_pix*ny_pix)*(duration*1e9))  # or use your constants if defined
+                time.sleep(1)  # Let it collect for a second
+                counts = self.tagger.get_countrate_data()
+                print("Tagger Count Rates (Hz):", counts)
+
+                # Time Tagger config.
+                #self.tagger.start_counter([4], 1e8, data_points, data_points * 1e8)  # Start counter on channel 4
+                pix_start_ch = 4
+                pix_end_ch = -4
+                spcm_ch = 3
+                self.tagger.set_trigger_level(spcm_ch, 1.0) # Sets the SPCM trigger level at 1.1 V.
+                self.tagger.set_trigger_level(pix_start_ch, 1.2) # Sets the MCL's controller trigger level at 2.5 V.
+                npix = nx_pix * ny_pix
+                # Debug step ###########################
+                self.tagger.start_counter([spcm_ch], 1e8, 100, 1e10)  # 100 values, 10ns resolution
+                time.sleep(0.5)
+                spcm_counts = self.tagger.get_counter_data()
+                print("Raw SPCM counter:", spcm_counts)
+                ########################################
+                cbm_remote = self.tagger.count_BM(spcm_ch, pix_start_ch, pix_end_ch, npix)
+                time.sleep(npix*(duration*1e-3) + 0.2)
+                cbm = obtain(cbm_remote)
+                
+                # Troubleshooting
+                print("CBM shape:", cbm.shape)
+                print("CBM max:", np.max(cbm))
+                print("CBM min:", np.min(cbm))
+                print("CBM data:", cbm)
+
+
+                # Push data to data server
+                scan_data.push({
+                    'title': 'XY Scan',    
+                    'xLabel': 'X (um)',
+                    'yLabel': 'Y (um)',
+                    'zLabel': 'Counts',
+                    'datasets': {
+                        'xSteps': x_wfm,
+                        'ySteps': y_wfm,
+                        'ScanCounts': cbm
+                    }
+                }) 
+
+                # Display scan result
+                img = np.reshape(cbm, (ny_pix, nx_pix))
+                plt.figure()
+                plt.imshow(
+                    img, 
+                    cmap='hot', 
+                    origin='lower',
+                    aspect='auto',
+                    extent=[x_min, x_max, y_min, y_max]
+                )
+                plt.xlabel('X (µm)')
+                plt.ylabel('Y (µm)')
+                plt.title('Scan Counts')
+                plt.colorbar(label='Counts')
+                plt.show()
+
+                """
                 y_lines = int(total_y_length/step_size)
                 
                 for i in range(y_lines):
@@ -306,6 +404,7 @@ class ScanWidget(QtWidgets.QWidget):
                 plt.title('Scan Counts')
                 plt.colorbar(label='Counts')
                 plt.show()
+                """
             
         start_xy.clicked.connect(scan_xy)
         layout.addWidget(start_xy, layout_row, 0)
