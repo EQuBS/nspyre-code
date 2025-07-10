@@ -1,4 +1,5 @@
-import TimeTagger as tt 
+import TimeTagger as tt
+from TimeTagger import CHANNEL_UNUSED 
 
 class tt20:
     
@@ -92,7 +93,7 @@ class tt20:
         return measurement_type.isRunning()
     
     #Counts between marked events, introd. 6/27/2025 by Rolando
-    def count_BM(self, click_channel, begin_channel, end_channel, n_values):
+    def count_BM(self, click_channel, begin_channel, end_channel=CHANNEL_UNUSED, n_values=1000):
         """
         Uses the TimeTagger CountBetweenMarkers measurement.
 
@@ -112,7 +113,8 @@ class tt20:
         except AttributeError:
             raise AttributeError("Your TimeTagger module does not have CountBetweenMarkers. Please check your TimeTagger version.")
 
-
+    """ def unused(self):
+        return tt """
     #def get_Index(self)
         
     #frees the Time Tagger object

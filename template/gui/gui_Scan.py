@@ -6,7 +6,7 @@ Rolando A. Fimbres Grijalva 6/23/2025
 from PyQt5.QtWidgets import QSizePolicy
 from pyqtgraph.Qt import QtWidgets
 from pyqtgraph import SpinBox
-from MCL_Madlib_Wrapper import MCL_Nanodrive
+#from MCL_Madlib_Wrapper import MCL_Nanodrive
 from PyQt5.QtWidgets import QMessageBox
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,6 +21,7 @@ from nspyre import StreamingList
 from nspyre import DataSink, FlexLinePlotWidget
 import numpy as np
 import time
+from TimeTagger import CHANNEL_UNUSED
 
 sys.path.append('../experiments')
 
@@ -273,40 +274,42 @@ class ScanWidget(QtWidgets.QWidget):
                 data_points = len(x_wfm) # Number of data points in the x-waveform
 
                 # Timing and iteration
-                duration = 1  # Time in milliseconds between data points (from 0.1ms to 5ms)
+                duration = 0.2  # Time in milliseconds between data points (from 0.1ms to 5ms)
                 iter = 1  # Number of iterations for the waveform. We can add a SpinBox to change this value in the future.
-
-                # Send waveform to the MCL Nanodrive
-                self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
-                self.nano.iss_bind_clock_to_axis(1, 2, 2, self.nano.handle)  # Bind clock to Waveform Write
-                self.nano.wfma_trigger(self.nano.handle)
-                print("Triggered scan with", data_points, "points.")
-
-                # Wait for a moment to allow TTL pulses to start
-                time.sleep(0.5)
-
-                # Start countrate on channels 3 (SPCM) and 4 (Pixel Clock)
-                self.tagger.start_countrate([3, 4], (nx_pix*ny_pix)*(duration*1e9))  # or use your constants if defined
-                time.sleep(1)  # Let it collect for a second
-                counts = self.tagger.get_countrate_data()
-                print("Tagger Count Rates (Hz):", counts)
 
                 # Time Tagger config.
                 #self.tagger.start_counter([4], 1e8, data_points, data_points * 1e8)  # Start counter on channel 4
                 pix_start_ch = 4
                 pix_end_ch = -4
                 spcm_ch = 3
+
+                npix = nx_pix * ny_pix
+
+                # Trigger levels on TT
                 self.tagger.set_trigger_level(spcm_ch, 1.0) # Sets the SPCM trigger level at 1.1 V.
                 self.tagger.set_trigger_level(pix_start_ch, 1.2) # Sets the MCL's controller trigger level at 2.5 V.
-                npix = nx_pix * ny_pix
-                # Debug step ###########################
-                self.tagger.start_counter([spcm_ch], 1e8, 100, 1e10)  # 100 values, 10ns resolution
-                time.sleep(0.5)
-                spcm_counts = self.tagger.get_counter_data()
-                print("Raw SPCM counter:", spcm_counts)
-                ########################################
-                cbm_remote = self.tagger.count_BM(spcm_ch, pix_start_ch, pix_end_ch, npix)
-                time.sleep(npix*(duration*1e-3) + 0.2)
+
+                # Send waveform to the MCL Nanodrive
+                self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
+                self.nano.iss_bind_clock_to_axis(1, 2, 6, self.nano.handle)  # Bind clock to Waveform Write
+                                
+                cbm_remote = self.tagger.count_BM(click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values=1000)
+
+                self.nano.wfma_trigger(self.nano.handle)
+                #print("Triggered scan with", data_points, "points.")
+
+                # Wait for a moment to allow TTL pulses to start
+                #time.sleep(0.5)
+
+                """ # Start countrate on channels 3 (SPCM) and 4 (Pixel Clock)
+                self.tagger.start_countrate([3, 4], (nx_pix*ny_pix)*(duration*1e9))  # or use your constants if defined
+                #time.sleep(1)  # Let it collect for a second
+                counts = self.tagger.get_countrate_data()
+                print("Tagger Count Rates (Hz):", counts) """
+                
+                
+                
+                #time.sleep(npix*(duration*1e-3) + 0.2)
                 cbm = obtain(cbm_remote)
                 
                 # Troubleshooting
@@ -315,6 +318,12 @@ class ScanWidget(QtWidgets.QWidget):
                 print("CBM min:", np.min(cbm))
                 print("CBM data:", cbm)
 
+                # Debug step ###########################
+                self.tagger.start_counter([spcm_ch, pix_start_ch], duration*1e9, npix, npix*(duration*1e9))  # 100 values, 10ns resolution
+                time.sleep(0.1)
+                #spcm_counts = self.tagger.get_counter_data()
+                #print("Raw SPCM counter:", spcm_counts)
+                
 
                 # Push data to data server
                 scan_data.push({
