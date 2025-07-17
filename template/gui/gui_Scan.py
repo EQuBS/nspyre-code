@@ -285,6 +285,7 @@ class ScanWidget(QtWidgets.QWidget):
 
                 npix = nx_pix * ny_pix
 
+
                 # Trigger levels on TT
                 self.tagger.set_trigger_level(spcm_ch, 1.0) # Sets the SPCM trigger level at 1.1 V.
                 self.tagger.set_trigger_level(pix_start_ch, 1.2) # Sets the MCL's controller trigger level at 2.5 V.
@@ -292,8 +293,8 @@ class ScanWidget(QtWidgets.QWidget):
                 # Send waveform to the MCL Nanodrive
                 self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
                 self.nano.iss_bind_clock_to_axis(1, 2, 6, self.nano.handle)  # Bind clock to Waveform Write
-                                
-                cbm_remote = self.tagger.count_BM(click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values=1000)
+
+                cbm_remote = self.tagger.count_BM(click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values=npix)
 
                 self.nano.wfma_trigger(self.nano.handle)
                 #print("Triggered scan with", data_points, "points.")
@@ -301,11 +302,11 @@ class ScanWidget(QtWidgets.QWidget):
                 # Wait for a moment to allow TTL pulses to start
                 #time.sleep(0.5)
 
-                """ # Start countrate on channels 3 (SPCM) and 4 (Pixel Clock)
-                self.tagger.start_countrate([3, 4], (nx_pix*ny_pix)*(duration*1e9))  # or use your constants if defined
+                """ # Start countrate on channels 3 (SPCM) and 4 (Pixel Clock)"""
+                #self.tagger.start_countrate([3, 4], (nx_pix*ny_pix)*(duration*1e9))  # or use your constants if defined
                 #time.sleep(1)  # Let it collect for a second
-                counts = self.tagger.get_countrate_data()
-                print("Tagger Count Rates (Hz):", counts) """
+                #counts = self.tagger.get_countrate_data()
+                #print("Tagger Count Rates (Hz):", counts) 
                 
                 
                 
