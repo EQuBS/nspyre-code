@@ -237,10 +237,22 @@ class ScanWidget(QtWidgets.QWidget):
                 # Updated by Rolando 7/7/2025
 
                 # Axis config. from GUI
-                x_min = self.x_min_box.value()
-                x_max = self.x_max_box.value()
-                y_min = self.y_min_box.value()
-                y_max = self.y_max_box.value()
+                """ The parameters define the scan area from its current position.
+                Meaning, current position plus the minimum and maximum values set in the spin boxes.  
+                """
+                
+                """ # Current position
+                x_pos = self.nano.single_read_n(1, self.nano.handle)  # Read current X position
+                y_pos = self.nano.single_read_n(2, self.nano.handle)  # Read current Y position
+
+                # Movement to current position
+                self.nano.single_write_n(x_pos, 1, self.nano.handle)  # Set X position
+                self.nano.single_write_n(y_pos, 2, self.nano.handle)  # Set Y position """
+
+                x_min = self.nano.single_read_n(1, self.nano.handle) + self.x_min_box.value()  # Read current X position
+                x_max = x_min + self.x_max_box.value()
+                y_min = self.nano.single_read_n(2, self.nano.handle) + self.y_min_box.value()  # Read current Y position
+                y_max = y_min + self.y_max_box.value()
                 nx_pix = self.data_points_x.value()
                 ny_pix = self.data_points_y.value()
 
@@ -274,14 +286,14 @@ class ScanWidget(QtWidgets.QWidget):
                 data_points = len(x_wfm) # Number of data points in the x-waveform
 
                 # Timing and iteration
-                duration = 0.2  # Time in milliseconds between data points (from 0.1ms to 5ms)
+                duration = 5  # Time in milliseconds between data points (from 0.1ms to 5ms)
                 iter = 1  # Number of iterations for the waveform. We can add a SpinBox to change this value in the future.
 
                 # Time Tagger config.
                 #self.tagger.start_counter([4], 1e8, data_points, data_points * 1e8)  # Start counter on channel 4
                 pix_start_ch = 4
-                pix_end_ch = -4
-                spcm_ch = 3
+                #pix_end_ch = -4
+                spcm_ch = 3 # eroaern
 
                 npix = nx_pix * ny_pix
 
@@ -294,9 +306,9 @@ class ScanWidget(QtWidgets.QWidget):
                 self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
                 self.nano.iss_bind_clock_to_axis(1, 2, 6, self.nano.handle)  # Bind clock to Waveform Write
 
-                cbm_remote = self.tagger.count_BM(click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values=npix)
-
+                self.tagger.start_cbm(click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values=4225)
                 self.nano.wfma_trigger(self.nano.handle)
+                cbm_remote = self.tagger.count_BM()
                 #print("Triggered scan with", data_points, "points.")
 
                 # Wait for a moment to allow TTL pulses to start
@@ -309,7 +321,6 @@ class ScanWidget(QtWidgets.QWidget):
                 #print("Tagger Count Rates (Hz):", counts) 
                 
                 
-                
                 #time.sleep(npix*(duration*1e-3) + 0.2)
                 cbm = obtain(cbm_remote)
                 
@@ -317,15 +328,18 @@ class ScanWidget(QtWidgets.QWidget):
                 print("CBM shape:", cbm.shape)
                 print("CBM max:", np.max(cbm))
                 print("CBM min:", np.min(cbm))
-                print("CBM data:", cbm)
+                print("CBM data:", cbm, np.sum(cbm))
 
                 # Debug step ###########################
-                self.tagger.start_counter([spcm_ch, pix_start_ch], duration*1e9, npix, npix*(duration*1e9))  # 100 values, 10ns resolution
-                time.sleep(0.1)
-                #spcm_counts = self.tagger.get_counter_data()
-                #print("Raw SPCM counter:", spcm_counts)
+                self.tagger.start_counter([spcm_ch, pix_start_ch], duration*1e9, npix, npix*(duration*1e9))
+                self.tagger.start_countrate([spcm_ch, pix_start_ch], npix*(duration*1e9))  # 100 values, 10ns resolution
+                #time.sleep(0.1)
+                spcm_counts = self.tagger.get_counter_data()
+                spcm_rate = self.tagger.get_countrate_data()
+                print("Raw SPCM counter:", spcm_counts)
+                print("SPCM count rate:", spcm_rate)
                 
-
+                spcm_c = obtain(spcm_counts)  # Convert remote data to local numpy array
                 # Push data to data server
                 scan_data.push({
                     'title': 'XY Scan',    
@@ -340,14 +354,14 @@ class ScanWidget(QtWidgets.QWidget):
                 }) 
 
                 # Display scan result
-                img = np.reshape(cbm, (ny_pix, nx_pix))
+                img = np.reshape(spcm_c[0], (ny_pix, nx_pix))
                 plt.figure()
                 plt.imshow(
                     img, 
                     cmap='hot', 
                     origin='lower',
                     aspect='auto',
-                    extent=[x_min, x_max, y_min, y_max]
+                    extent=[x_min - 100, x_max - 100, y_min - 100, y_max - 100]
                 )
                 plt.xlabel('X (µm)')
                 plt.ylabel('Y (µm)')

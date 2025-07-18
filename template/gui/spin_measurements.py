@@ -46,7 +46,7 @@ class SpinMeasurements:
         '''
         # with InstrumentGateway() as gw:
         try:
-            print("check entered read function")
+            #print("check entered read function")
                 #sampling_time = 50000 #gw.ps.sampling_time # in [ns] , Introd. sampl. time as an argument to the read function
             gw.daq.start_counter([3], sampling_time, runs, sampling_time*runs)
         except:
@@ -56,13 +56,13 @@ class SpinMeasurements:
         #gw.ps.laser_on()
         # execute chosen sequence on Pulse Streamer
         #gw.ps.stream(seq, runs) # 5/28/2025 commented by Rolando
-        print("successfully streaming")
+        #print("successfully streaming")
         tt_data = gw.daq.get_counter_data()[0] # get the counter data from DAQ
         print("tt_data: ", tt_data)
         #import pdb; pdb.set_trace()
         # convert data back to numpy array from rpyc.netref data type
         buffer = obtain(tt_data)
-        print("buffer: ", buffer)
+        #print("buffer: ", buffer)
 
             # gw.daq.stop_task()
             #gw.ps.ps.reset() # from Pulser to ps
@@ -354,13 +354,13 @@ class SpinMeasurements:
             
 
             for i in range(10000):
-                print(i)
+                #print(i)
                 #gw.daq.start_counter
                 # Stream the pulse sequence by ps, meausre the signal from APD and read it out by DAQ
-                print(time.time() - time_start) 
+                #print(time.time() - time_start) 
                 sig_result_raw = self.read(signal_array, sampling_time, n_runs, gw) # 5/28/2025 commented by Rolando 
-                print(time.time() -time_start)
-                print("sig_result_raw: ", sig_result_raw)
+                #print(time.time() -time_start)
+                #print("sig_result_raw: ", sig_result_raw)
                 # keeps the laser trigger on ?
                 #gw.ps.laser_on()
                 #print("TIME 1 = ", time.time() - time_start)
@@ -372,7 +372,7 @@ class SpinMeasurements:
                 sig_result = sig_result_raw[0]  #np.mean(delta_signal)*sampling_rate
                 # print("signal AFTER avg over the total sampling time: ", sig_result)
                 time_pt = time.time() - time_start
-                print("TIME 2 = ", time_pt)
+                #print("TIME 2 = ", time_pt)
                 # Update the StreamingList
                 PL_data_StreamingList.append(sig_result)
                 t_StreamingList.append(time_pt)
@@ -387,7 +387,7 @@ class SpinMeasurements:
                                     'ylabel': 'Counts/s',
                                     'datasets': {'SigVsT_data' : PL_t_StreamingList}
                     })
-                print("TIME END LOOP = ", time.time() - time_start)
+                #print("TIME END LOOP = ", time.time() - time_start)
                 
                 if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
                     gw.laser.off()

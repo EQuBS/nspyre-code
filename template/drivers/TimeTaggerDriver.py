@@ -92,8 +92,13 @@ class tt20:
     def is_measurement_running(self, measurement_type):
         return measurement_type.isRunning()
     
+
+    def start_cbm(self, click_channel, begin_channel, end_channel=CHANNEL_UNUSED, n_values=1000):
+        self.cbm = tt.CountBetweenMarkers(self.tagger, click_channel, begin_channel, end_channel, n_values)
+        self.cbm.start()
+
     #Counts between marked events, introd. 6/27/2025 by Rolando
-    def count_BM(self, click_channel, begin_channel, end_channel=CHANNEL_UNUSED, n_values=1000):
+    def count_BM(self):
         """
         Uses the TimeTagger CountBetweenMarkers measurement.
 
@@ -105,10 +110,8 @@ class tt20:
         Returns: The data from CountBetweenMarkers after measurement.
         """
         try:
-            cbm = tt.CountBetweenMarkers(self.tagger, click_channel, begin_channel, end_channel, n_values)
-            cbm.start()
-            cbm.waitUntilFinished()
-            data = cbm.getData()
+            self.cbm.waitUntilFinished()
+            data = self.cbm.getData()
             return data
         except AttributeError:
             raise AttributeError("Your TimeTagger module does not have CountBetweenMarkers. Please check your TimeTagger version.")
