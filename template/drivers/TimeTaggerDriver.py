@@ -21,10 +21,11 @@ class tt20:
     # - binwidth: width of each bin in ps
     # - n_values: number of bins to store
     # - measurement_duration: duration of the measurement in ps
-    def start_counter(self, channels, binwidth, n_values, measurement_duration):
-        
+    def start_counter(self, channels, binwidth, n_values, measurement_duration, tagger=None):
+        if tagger is None:
+            tagger = self.tagger
         try:
-            self.counter = tt.Counter(self.tagger, channels=channels, binwidth=binwidth, n_values=n_values)
+            self.counter = tt.Counter(tagger, channels=channels, binwidth=binwidth, n_values=n_values)
         except Exception as e:
             if not isinstance(channels, list) or not all(isinstance(ch, int) for ch in channels):
                 raise ValueError("Channels must be a list of integers.")
@@ -58,8 +59,10 @@ class tt20:
     #initalizes countrate measurement
     # - channels: list of channels to measure
     # - measurement_duration: duration of the measurement in ps
-    def start_countrate(self, channels, measurement_duration):
-        self.countrate = tt.Countrate(self.tagger, channels=channels)
+    def start_countrate(self, channels, measurement_duration, tagger=None):
+        if tagger is None:
+            tagger = self.tagger
+        self.countrate = tt.Countrate(tagger, channels=channels)
         self.countrate.startFor(measurement_duration)
 
     #runs countrate measurement for specified duration and returns data
@@ -93,9 +96,11 @@ class tt20:
         return measurement_type.isRunning()
     
 
-    def start_cbm(self, click_channel, begin_channel, end_channel=CHANNEL_UNUSED, n_values=1000):
-        self.cbm = tt.CountBetweenMarkers(self.tagger, click_channel, begin_channel, end_channel, n_values)
-        self.cbm.start()
+    def start_cbm(self, click_channel, begin_channel, end_channel=CHANNEL_UNUSED, n_values=1000, tagger=None):
+        if tagger is None:
+            tagger = self.tagger
+        self.cbm = tt.CountBetweenMarkers(tagger, click_channel, begin_channel, end_channel, n_values)
+        #self.cbm.startFor(s_For)
 
     #Counts between marked events, introd. 6/27/2025 by Rolando
     def count_BM(self):
@@ -119,7 +124,30 @@ class tt20:
     """ def unused(self):
         return tt """
     #def get_Index(self)
-        
+
+    # Create "SynchronizedMeasurements" for tagger, and get its tagger proxy.
+    def synchro(self):
+        """
+        Creates a SynchronizedMeasurement for the Time Tagger and returns its tagger proxy.
+        """
+        try:
+            self.synchro_measurement = tt.SynchronizedMeasurements(self.tagger)
+            tagger_proxy = self.synchro_measurement.getTagger()
+            return tagger_proxy
+        except Exception as e:
+            print(f"Error creating SynchronizedMeasurement: {e}")
+            return None
+    
+    # Synchro startFor method
+    def sync_sFor(self, duration):
+        # After syncho measurement is created, start it for a specified duration.
+        self.synchro_measurement.startFor(duration)
+
+    # Synchro waitUntilFinished method
+    def sync_wait(self):
+        # Wait until the synchronized measurement is finished.
+        self.synchro_measurement.waitUntilFinished()
+
     #frees the Time Tagger object
     def free_time_tagger(self):
         tt.freeTimeTagger(self.tagger)

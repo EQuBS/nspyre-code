@@ -296,7 +296,10 @@ class ScanWidget(QtWidgets.QWidget):
                 spcm_ch = 3 # eroaern
 
                 npix = nx_pix * ny_pix
+                print("Number of pixels:", npix)
 
+                # Create tagger for synchronized measurements
+                sync = self.tagger.synchro() #"""change"""
 
                 # Trigger levels on TT
                 self.tagger.set_trigger_level(spcm_ch, 1.0) # Sets the SPCM trigger level at 1.1 V.
@@ -304,13 +307,22 @@ class ScanWidget(QtWidgets.QWidget):
 
                 # Send waveform to the MCL Nanodrive
                 self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
-                self.nano.iss_bind_clock_to_axis(1, 2, 6, self.nano.handle)  # Bind clock to Waveform Write
+                self.nano.iss_bind_clock_to_axis(1, 2, 5, self.nano.handle)  # Bind clock to Waveform READ, Changed 7/18/2025 
 
-                self.tagger.start_cbm(click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values=4225)
-                self.nano.wfma_trigger(self.nano.handle)
-                cbm_remote = self.tagger.count_BM()
+                # Counting events
+                self.tagger.start_cbm(tagger=sync, click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values= npix)
+                self.tagger.start_counter(tagger=sync, channels=[spcm_ch, pix_start_ch], binwidth=duration*1e9, n_values=npix, measurement_duration=npix*(duration*1e9))
+                self.tagger.start_countrate(tagger=sync, channels=[spcm_ch, pix_start_ch], measurement_duration=npix*(duration*1e9))  # 100 values, 10ns resolution
+                
                 #print("Triggered scan with", data_points, "points.")
+                
+                self.nano.wfma_trigger(self.nano.handle)
 
+                # StartFor and WaitUntilFinished synchronized measurements
+                self.tagger.sync_sFor(data_points*duration*1e9) #"""change # duration in ps """
+                self.tagger.sync_wait() # """change # Start synchronized measurement for the specified duration in seconds"""
+
+                cbm_remote = self.tagger.count_BM() # getData() for CountBetweenMarkers
                 # Wait for a moment to allow TTL pulses to start
                 #time.sleep(0.5)
 
@@ -328,14 +340,12 @@ class ScanWidget(QtWidgets.QWidget):
                 print("CBM shape:", cbm.shape)
                 print("CBM max:", np.max(cbm))
                 print("CBM min:", np.min(cbm))
-                print("CBM data:", cbm, np.sum(cbm))
+                print("CBM data:", cbm, "Sum of counts:", np.sum(cbm))
 
                 # Debug step ###########################
-                self.tagger.start_counter([spcm_ch, pix_start_ch], duration*1e9, npix, npix*(duration*1e9))
-                self.tagger.start_countrate([spcm_ch, pix_start_ch], npix*(duration*1e9))  # 100 values, 10ns resolution
                 #time.sleep(0.1)
-                spcm_counts = self.tagger.get_counter_data()
-                spcm_rate = self.tagger.get_countrate_data()
+                spcm_counts = self.tagger.get_counter_data() # getData() for SPCM Counter and TTLs
+                spcm_rate = self.tagger.get_countrate_data() # getData() for SPCM Count Rate
                 print("Raw SPCM counter:", spcm_counts)
                 print("SPCM count rate:", spcm_rate)
                 
