@@ -153,9 +153,11 @@ class PS82():
         return self.ps.constant(OutputState([self.channel_dict["laser"]], 0.0, 0.0))
 
     def gate_on(self):
-        return self.ps.constant(OutputState([self.channel_dict["gate"]], 0.0, 0.0))
+        # Gate AND Laser ON
+        return self.ps.constant(OutputState([self.channel_dict["gate"], self.channel_dict["laser"]], 0.0, 0.0))
 
     def gate_off(self):
+        # Gate AND Laser OFF
         return self.ps.constant(OutputState([], 0.0, 0.0))
 
     """

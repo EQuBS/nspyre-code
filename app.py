@@ -9,6 +9,7 @@ import nspyre.gui.widgets.save
 import nspyre.gui.widgets.load
 import nspyre.gui.widgets.flex_line_plot
 import nspyre.gui.widgets.subsystem
+import nspyre.gui.widgets.heatmap
 from nspyre import MainWidget
 from nspyre import MainWidgetItem
 from nspyre import nspyre_init_logger
@@ -103,6 +104,11 @@ def main():
                     'FlexLinePlot_SigVSTime': MainWidgetItem(
                         template.gui.gui_SigVsTime,
                         'FlexLinePlotWidgetWithSigVsTime',
+                        stretch=(100, 100),
+                    ),
+                    'ScanPlot': MainWidgetItem(
+                        template.gui.gui_Scan,
+                        'ScanPlotWidget',
                         stretch=(100, 100),
                     ),
                 },
