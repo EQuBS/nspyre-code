@@ -849,3 +849,17 @@ class ScanPlotWidget(HeatMapWidget):
     def update(self):
         self.sink.pop() #wait for some data to be saved to sink
         self.set_data(self.sink.datasets['xSteps'], self.sink.datasets['ySteps'], self.sink.datasets['ScanCounts'])
+
+"""
+7/25/2025
+Rolando A. Fimbres Grijalva
+
+Implementation of the HeatmapWidget for the XZ Scan. I needed to make the weird reshape,
+the plotting widget required:
+1) 1D array for X steps
+2) 1D array for Y steps
+3) 2D array for scan counts (the reason I reshaped from the 1D we get from the Time Tagger).
+
+This is TEMPORARY and will be changed.
+
+"""
