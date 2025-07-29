@@ -245,7 +245,7 @@ class ScanWidget(QtWidgets.QWidget):
         """
         def scan_xy():
 
-            with DataSource('Scan_data') as scan_data:
+            with DataSource('XY Scan') as scan_data:
                 
                 # Updated by Rolando 7/7/2025
 
@@ -329,16 +329,17 @@ class ScanWidget(QtWidgets.QWidget):
                 y_out = original_output[1] # Original Y output
 
                 # I make use of the adjust input function to adjust the input waveform. 
-                x_corrected = self.adj_wfm("x", x_out, x_wfm)
-                y_corrected = self.adj_wfm("y", y_out, y_wfm)
+                """  x_corrected = self.adj_wfm("x", x_out, x_wfm)
+                y_corrected = self.adj_wfm("y", y_out, y_wfm) """
 
                 """ I make use of the NEW corrected waveforms to run the REAL Scan. In summary 
                 I'll use wfma_setup(), and wfma_trigger_and_read() again. I need to read the 
                 waveform for a performance verification test at the end of the scan.
                 """
-                self.nano.wfma_setup(x_corrected, y_corrected, None, data_points, duration, iter, self.nano.handle)
+                self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle) # Input waveform
                 self.nano.iss_bind_clock_to_axis(1, 2, 1, self.nano.handle)  # Bind clock to X-Axis, Changed 7/18/2025 
-                self.nano.wfma_trigger(self.nano.handle)
+                # final_trigger = self.nano.wfma_trigger_and_read(self.nano.handle)
+                final_trigger = self.nano.wfma_trigger(self.nano.handle) # We cannot use the wfma_trigger_and_read() function here. I wanted the real output position waveforms and use them. 7/28/2025
 
                 # Read output waveform after adjustment
                 #final_read = self.nano.wfma_read(self.nano.handle)
@@ -353,6 +354,10 @@ class ScanWidget(QtWidgets.QWidget):
                 # StartFor and WaitUntilFinished synchronized measurements
                 self.tagger.sync_sFor(data_points*duration*1e9) #"""change # duration in ps """
                 self.tagger.sync_wait() # """change # Start synchronized measurement for the specified duration in seconds"""
+
+                """ final_output = np.ctypeslib.as_array(final_trigger)  # Convert the read waveform to a numpy array
+                x_final = final_output[0]  # Final X output
+                y_final = final_output[1]  # Final Y output """
 
                 cbm_remote = self.tagger.count_BM() # getData() for CountBetweenMarkers
                 # Wait for a moment to allow TTL pulses to start
@@ -373,6 +378,8 @@ class ScanWidget(QtWidgets.QWidget):
                 print("CBM max:", np.max(cbm))
                 print("CBM min:", np.min(cbm))
                 print("CBM data:", cbm, "Sum of counts:", np.sum(cbm))
+                print("Array length X:", len(x_wfm), "Array length Y:", len(y_wfm))
+                print("CBM length:", len(cbm), "Expected pixels:", npix)
 
                 # Debug step ###########################
                 #time.sleep(0.1)
@@ -382,6 +389,32 @@ class ScanWidget(QtWidgets.QWidget):
                 print("SPCM count rate:", spcm_rate)
                 
                 spcm_c = obtain(spcm_counts)  # Convert remote data to local numpy array
+
+                #img = np.reshape(cbm, (ny_pix, nx_pix))
+
+                """ x_wfm = np.linspace(1, 3, 3)
+                y_wfm = np.linspace(1, 3, 3) """
+                #y_wfm = y_wfm[::-1]  # Reverse Y waveform for correct orientation
+                
+
+                #img = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+
+                #img = np.flipud(img)
+                
+                def snake(arr):
+                    for i in range(np.shape(arr)[0]):
+                        if i % 2 != 0:
+                            arr[i] = arr[i][::-1]
+                        else:
+                            arr[i] = arr[i]
+                    return arr
+                
+                img = np.reshape(cbm, (ny_pix, nx_pix))
+
+                img = snake(img) # Pixel data (counts) ready to be used in heatmap widget
+
+                print("snake:\n", img)
+
                 # Push data to data server
                 scan_data.push({
                     'title': 'XY Scan',    
@@ -391,20 +424,20 @@ class ScanWidget(QtWidgets.QWidget):
                     'datasets': {
                         'xSteps': x_wfm,
                         'ySteps': y_wfm,
-                        'ScanCounts': cbm
+                        'ScanCounts': img
                     }
                 }) 
 
                 # Display scan result
-                img = np.reshape(cbm, (ny_pix, nx_pix))
+                # img = np.reshape(cbm, (ny_pix, nx_pix))
                 plt.figure()
                 plt.imshow(
-                    img, 
+                    np.flipud(img), 
                     cmap='hot', 
                     origin='lower',
                     aspect='auto',
                     extent=[x_min, x_max, y_min, y_max]
-                )
+                ) # Flipped Up/Down for this display format (Different from the HeatMapWidget) Rolando A. Fimbres G. 7/28/2025
                 plt.xlabel('X (µm)')
                 plt.ylabel('Y (µm)')
                 plt.title('Scan Counts')
@@ -451,7 +484,9 @@ class ScanWidget(QtWidgets.QWidget):
                 cbm = self.tagger.count_BM(spcm_ch, pix_start_ch, pix_end_ch, npix)
                 #counts_remote = cbm.getData()  # Get the counts data
                 counts = obtain(cbm) # Convert remote data to local numpy array
-                # Push scan data to the data server
+                """
+
+                """  # Push scan data to the data server
                 scan_data.push({
                     'title': 'XY Scan',    
                     'xLabel': 'X (um)',
@@ -460,20 +495,20 @@ class ScanWidget(QtWidgets.QWidget):
                     'datasets': {
                         'xSteps': x_wfm,
                         'ySteps': y_wfm,
-                        'ScanCounts': counts
+                        'ScanCounts': img
                     }
-                })
+                }) """
 
                 # For immediate visualization with matplotlib (as before):
-                img = np.reshape(counts, (nx_pix, ny_pix))  # Reshape counts to image format
+                """ img = np.reshape(cbm, (nx_pix, ny_pix))  # Reshape counts to image format
                 plt.figure()
                 plt.imshow(img, cmap='hot', origin='lower', aspect='auto')
                 plt.xlabel('X pixel')
                 plt.ylabel('Y pixel')
                 plt.title('Scan Counts')
                 plt.colorbar(label='Counts')
-                plt.show()
-                """
+                plt.show() """
+                
             
         start_xy.clicked.connect(scan_xy)
         layout.addWidget(start_xy, layout_row, 0)
@@ -834,11 +869,11 @@ class ScanWidget(QtWidgets.QWidget):
 
 class ScanPlotWidget(HeatMapWidget):
     def __init__(self):
-        title = 'XZ Scan'
+        title = 'XY Scan'
         super().__init__(title=title, btm_label="X (µm)", lft_label="Y (µm)", colormap=None)
 
     def setup(self):
-        self.sink = DataSink('XZ Scan')
+        self.sink = DataSink('XY Scan')
         self.sink.__enter__()
 
 
