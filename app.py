@@ -31,6 +31,7 @@ from template.drivers.ps82 import PS82
 import template.gui.spin_measurements
 import template.gui.gui_Nano
 import template.gui.gui_Scan
+import template.gui.gui_ScanXZ
 from template.drivers.TimeTaggerDriver import tt20
 
 #print(template.gui.spin_measurements.__file__)
@@ -90,6 +91,7 @@ def main():
                 'Subsystems': MainWidgetItem(nspyre.gui.widgets.subsystem, 'SubsystemsWidget', args=[insmgr.subs.subsystems], stretch=(1, 1)),
                 'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano], stretch=(1, 1)),
                 'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
+                'XZ-Scan': MainWidgetItem(template.gui.gui_ScanXZ, 'ScanXZ', stretch=(1, 1)),
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(
                         template.gui.elements,

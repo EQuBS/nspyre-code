@@ -24,7 +24,10 @@ from nspyre import HeatMapWidget
 import numpy as np
 import time
 from TimeTagger import CHANNEL_UNUSED
-from scipy.signal import convolve, deconvolve
+from scipy.signal import convolve, deconvolve 
+import os
+
+img_dir = "C:/Users/XieLab/Documents/Confocal_System/Figures/Pixel_Test"
 
 
 sys.path.append('../experiments')
@@ -137,10 +140,10 @@ class ScanWidget(QtWidgets.QWidget):
 
         # Row 1: X position
         layout.addWidget(QtWidgets.QLabel('X'), layout_row, 0)
-        self.x_min_box.setRange(0.000, 200.000)
+        self.x_min_box.setRange(-100.000, 100.000)
         self.x_min_box.setDecimals(3)
         self.x_min_box.setSingleStep(0.003)
-        self.x_max_box.setRange(2.000, 200.000)
+        self.x_max_box.setRange(-100.000, 100.000)
         self.x_max_box.setDecimals(3)
         self.x_max_box.setSingleStep(0.003)
         self.data_points_x.setRange(2, 70)
@@ -151,10 +154,10 @@ class ScanWidget(QtWidgets.QWidget):
 
         # Row 2: Y position
         layout.addWidget(QtWidgets.QLabel('Y'), layout_row, 0)
-        self.y_min_box.setRange(0.000, 200.000)
+        self.y_min_box.setRange(-100.000, 100.000)
         self.y_min_box.setDecimals(3)
         self.y_min_box.setSingleStep(0.003)
-        self.y_max_box.setRange(2.000, 200.000)
+        self.y_max_box.setRange(-100.000, 100.000)
         self.y_max_box.setDecimals(3)
         self.y_max_box.setSingleStep(0.003)
         self.data_points_y.setRange(2, 70) #
@@ -165,10 +168,10 @@ class ScanWidget(QtWidgets.QWidget):
 
         # Row 3: Z position
         layout.addWidget(QtWidgets.QLabel('Z'), layout_row, 0)
-        self.z_min_box.setRange(0.000, 200.000)
+        self.z_min_box.setRange(-100.000, 100.000)
         self.z_min_box.setDecimals(3)
         self.z_min_box.setSingleStep(0.003)
-        self.z_max_box.setRange(2.000, 200.000)
+        self.z_max_box.setRange(-100.000, 100.000)
         self.z_max_box.setDecimals(3)
         self.z_max_box.setSingleStep(0.003)
         self.data_points_z.setRange(2, 70)  # Set range for Z data points
@@ -216,8 +219,8 @@ class ScanWidget(QtWidgets.QWidget):
         
         # Waveform data
 
-        x_line_for = np.arange(self.x_min_box.value(), self.x_max_box.value(), step_size)
-        x_line_bac = x_line_for[::-1] # X line backward      
+        """ x_line_for = np.arange(self.x_min_box.value(), self.x_max_box.value(), step_size)
+        x_line_bac = x_line_for[::-1] # X line backward  """     
         
 
         # Start Scan Button
@@ -262,10 +265,10 @@ class ScanWidget(QtWidgets.QWidget):
                 self.nano.single_write_n(x_pos, 1, self.nano.handle)  # Set X position
                 self.nano.single_write_n(y_pos, 2, self.nano.handle)  # Set Y position """
 
-                x_min = self.nano.single_read_n(1, self.nano.handle) + self.x_min_box.value()  # Read current X position
-                x_max = x_min + self.x_max_box.value()
-                y_min = self.nano.single_read_n(2, self.nano.handle) + self.y_min_box.value()  # Read current Y position
-                y_max = y_min + self.y_max_box.value()
+                x_min = 100 + self.x_min_box.value()  # Read current X position
+                x_max = 100 + self.x_max_box.value()
+                y_min = 100 + self.y_min_box.value()  # Read current Y position
+                y_max = 100 + self.y_max_box.value()
                 nx_pix = self.data_points_x.value()
                 ny_pix = self.data_points_y.value()
 
@@ -323,10 +326,10 @@ class ScanWidget(QtWidgets.QWidget):
                 adjust the original input waveform, through deconvolution, and use the result for the REAL scan.
                 """
                 self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
-                read_wfm1 = self.nano.wfma_trigger_and_read(self.nano.handle)  # Read the waveform back from the MCL Nanodrive
-                original_output = np.ctypeslib.as_array(read_wfm1)  # Convert the read waveform to a numpy array
-                x_out = original_output[0] # Original X output
-                y_out = original_output[1] # Original Y output
+                #read_wfm1 = self.nano.wfma_trigger_and_read(self.nano.handle)  # Read the waveform back from the MCL Nanodrive
+                #original_output = np.ctypeslib.as_array(read_wfm1)  # Convert the read waveform to a numpy array
+                """ x_out = original_output[0] # Original X output
+                y_out = original_output[1] # Original Y output """
 
                 # I make use of the adjust input function to adjust the input waveform. 
                 """  x_corrected = self.adj_wfm("x", x_out, x_wfm)
@@ -339,7 +342,7 @@ class ScanWidget(QtWidgets.QWidget):
                 self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle) # Input waveform
                 self.nano.iss_bind_clock_to_axis(1, 2, 1, self.nano.handle)  # Bind clock to X-Axis, Changed 7/18/2025 
                 # final_trigger = self.nano.wfma_trigger_and_read(self.nano.handle)
-                final_trigger = self.nano.wfma_trigger(self.nano.handle) # We cannot use the wfma_trigger_and_read() function here. I wanted the real output position waveforms and use them. 7/28/2025
+                
 
                 # Read output waveform after adjustment
                 #final_read = self.nano.wfma_read(self.nano.handle)
@@ -350,10 +353,12 @@ class ScanWidget(QtWidgets.QWidget):
                 self.tagger.start_countrate(tagger=sync, channels=[spcm_ch, pix_start_ch], measurement_duration=npix*(duration*1e9))  # 100 values, 10ns resolution
                 
                 #print("Triggered scan with", data_points, "points.")
+                self.nano.wfma_trigger(self.nano.handle) # We cannot use the wfma_trigger_and_read() function here. I wanted the real output position waveforms and use them. 7/28/2025
 
                 # StartFor and WaitUntilFinished synchronized measurements
                 self.tagger.sync_sFor(data_points*duration*1e9) #"""change # duration in ps """
                 self.tagger.sync_wait() # """change # Start synchronized measurement for the specified duration in seconds"""
+
 
                 """ final_output = np.ctypeslib.as_array(final_trigger)  # Convert the read waveform to a numpy array
                 x_final = final_output[0]  # Final X output
@@ -403,15 +408,17 @@ class ScanWidget(QtWidgets.QWidget):
                 
                 def snake(arr):
                     for i in range(np.shape(arr)[0]):
-                        if i % 2 != 0:
+                        if i % 2 == 0:
                             arr[i] = arr[i][::-1]
                         else:
                             arr[i] = arr[i]
                     return arr
                 
                 img = np.reshape(cbm, (ny_pix, nx_pix))
+                img = np.flipud(img)  # Flip the image upside down for correct orientation
+                img = snake(img) # Pixel data (counts) ready to be used in heatmap widget \\\ reshape done before
 
-                img = snake(img) # Pixel data (counts) ready to be used in heatmap widget
+                np.save(os.path.join(img_dir, "XY_Scan.npy"), img)  # Save the image data to a file
 
                 print("snake:\n", img)
 
@@ -565,10 +572,10 @@ class ScanWidget(QtWidgets.QWidget):
                 self.nano.single_write_n(x_pos, 1, self.nano.handle)  # Set X position
                 self.nano.single_write_n(y_pos, 2, self.nano.handle)  # Set Y position """
 
-                x_min = self.nano.single_read_n(1, self.nano.handle) + self.x_min_box.value()  # Read current X position
-                x_max = x_min + self.x_max_box.value()
-                z_min = self.nano.single_read_n(3, self.nano.handle) + self.z_min_box.value()  # Read current Z position
-                z_max = z_min + self.z_max_box.value()
+                x_min = 100 + self.x_min_box.value()  # Read current X position
+                x_max = 100 + self.x_max_box.value()
+                z_min = 100 + self.z_min_box.value()  # Read current Z position
+                z_max = 100 + self.z_max_box.value()
                 nx_pix = self.data_points_x.value()
                 nz_pix = self.data_points_z.value()
 
@@ -615,7 +622,7 @@ class ScanWidget(QtWidgets.QWidget):
                 print("Number of pixels:", npix)
 
                 # Create tagger for synchronized measurements
-                sync = self.tagger.synchro() #"""change"""
+                sync2 = self.tagger.synchro() #"""change"""
 
                 # Trigger levels on TT
                 self.tagger.set_trigger_level(spcm_ch, 1.0) # Sets the SPCM trigger level at 1.1 V.
@@ -623,25 +630,25 @@ class ScanWidget(QtWidgets.QWidget):
 
                 # Waveform setup for calibration
                 self.nano.wfma_setup(x_wfm, None, z_wfm, data_points, duration, iter, self.nano.handle)
-                read_wfm1 = self.nano.wfma_trigger_and_read(self.nano.handle)
+                """ read_wfm1 = self.nano.wfma_trigger_and_read(self.nano.handle)
                 original_output = np.ctypeslib.as_array(read_wfm1)  # Convert the read waveform to a numpy array
                 x_out = original_output[0] # Original X output
-                z_out = original_output[1] # Original Z output
+                z_out = original_output[1] # Original Z output """
 
-                # Adjusted waveforms
+                """ # Adjusted waveforms
                 x_corrected = self.adj_wfm("x", x_out, x_wfm)
-                z_corrected = self.adj_wfm("z", z_out, z_wfm)
+                z_corrected = self.adj_wfm("z", z_out, z_wfm) """
 
                 # Send waveform to the MCL Nanodrive
-                self.nano.wfma_setup(x_corrected, None, z_corrected, data_points, duration, iter, self.nano.handle)
-                self.nano.iss_bind_clock_to_axis(1, 2, 1, self.nano.handle)  # Bind clock to WRITE, Changed 7/24/2025
+                self.nano.wfma_setup(x_wfm, None, z_wfm, data_points, duration, iter, self.nano.handle)
+                self.nano.iss_bind_clock_to_axis(1, 2, 3, self.nano.handle)  # Bind clock to WRITE, Changed 7/24/2025
                 #self.nano.wfma_trigger(self.nano.handle)
                 
                 # Counting events
-                self.tagger.start_cbm(tagger=sync, click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values= npix)
-                self.tagger.start_counter(tagger=sync, channels=[spcm_ch, pix_start_ch], binwidth=duration*1e9, n_values=npix, measurement_duration=npix*(duration*1e9))
-                self.tagger.start_countrate(tagger=sync, channels=[spcm_ch, pix_start_ch], measurement_duration=npix*(duration*1e9))  # 100 values, 10ns resolution
-                
+                self.tagger.start_cbm(tagger=sync2, click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values= npix)
+                self.tagger.start_counter(tagger=sync2, channels=[spcm_ch, pix_start_ch], binwidth=duration*1e9, n_values=npix, measurement_duration=npix*(duration*1e9))
+                self.tagger.start_countrate(tagger=sync2, channels=[spcm_ch, pix_start_ch], measurement_duration=npix*(duration*1e9))  # 100 values, 10ns resolution
+
                 #print("Triggered scan with", data_points, "points.")
                 self.nano.wfma_trigger(self.nano.handle)
 
@@ -668,6 +675,8 @@ class ScanWidget(QtWidgets.QWidget):
                 print("CBM max:", np.max(cbm))
                 print("CBM min:", np.min(cbm))
                 print("CBM data:", cbm, "Sum of counts:", np.sum(cbm))
+                print("Array length X:", len(x_wfm), "Array length Z:", len(z_wfm))
+                print("CBM length:", len(cbm), "Expected pixels:", npix)
 
                 # Debug step ###########################
                 #time.sleep(0.1)
@@ -676,17 +685,27 @@ class ScanWidget(QtWidgets.QWidget):
                 print("Raw SPCM counter:", spcm_counts)
                 print("SPCM count rate:", spcm_rate)
 
-                print("X-array length:", len(x_wfm))
-                print("Y-array length:", len(z_wfm))
+                """ print("X-array length:", len(x_wfm))
+                print("Y-array length:", len(z_wfm)) """
 
                 spcm_c = obtain(spcm_counts)  # Convert remote data to local numpy array
                 # Push data to data server
 
+                def snake(arr):
+                    for i in range(np.shape(arr)[0]):
+                        if i % 2 == 0:
+                            arr[i] = arr[i][::-1]
+                        else:
+                            arr[i] = arr[i]
+                    return arr
+                
                 img = np.reshape(cbm, (nz_pix, nx_pix))  # Reshape counts to image format
+                img = np.flipud(img)  # Flip the image upside down for correct orientation
+                img = snake(img) # Pixel data (counts) ready to be used in heatmap
 
                 # 7/25/2025  
                 # I didnt used the adjusted values, just x_wfm and z_wfm. The reason is arrays not matching. I'll fix that later.
-                scan_data.push({
+                """ scan_data.push({
                     'title': 'XZ Scan',    
                     'xLabel': 'X (µm)',
                     'yLabel': 'Z (µm)',
@@ -696,7 +715,7 @@ class ScanWidget(QtWidgets.QWidget):
                         'ySteps': z_wfm,
                         'ScanCounts': img
                     }
-                }) 
+                }) """
                 
 
                 # Display scan result
@@ -706,9 +725,9 @@ class ScanWidget(QtWidgets.QWidget):
                 for i in range(1, nz_pix, 2):
                     img[i] = img[i][::-1] """
 
-                """ plt.figure()
+                plt.figure()
                 plt.imshow(
-                    img, 
+                    np.flipud(img), 
                     cmap='hot', 
                     origin='lower',
                     aspect='auto',
@@ -719,7 +738,7 @@ class ScanWidget(QtWidgets.QWidget):
                 plt.title('Scan Counts')
                 plt.colorbar(label='Counts')
                 plt.show()
- """
+ 
 
         start_xz.clicked.connect(scan_xz)
         layout.addWidget(start_xz, layout_row, 0)
