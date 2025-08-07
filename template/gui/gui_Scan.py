@@ -325,7 +325,7 @@ class ScanWidget(QtWidgets.QWidget):
                 """ The wfma_setup() and wfma_trigger&read are used once in order to gather the necessary data to 
                 adjust the original input waveform, through deconvolution, and use the result for the REAL scan.
                 """
-                self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
+                #self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
                 #read_wfm1 = self.nano.wfma_trigger_and_read(self.nano.handle)  # Read the waveform back from the MCL Nanodrive
                 #original_output = np.ctypeslib.as_array(read_wfm1)  # Convert the read waveform to a numpy array
                 """ x_out = original_output[0] # Original X output
@@ -443,7 +443,7 @@ class ScanWidget(QtWidgets.QWidget):
                     cmap='hot', 
                     origin='lower',
                     aspect='auto',
-                    extent=[x_min, x_max, y_min, y_max]
+                    extent=[x_min-100, x_max-100, y_min-100, y_max-100]
                 ) # Flipped Up/Down for this display format (Different from the HeatMapWidget) Rolando A. Fimbres G. 7/28/2025
                 plt.xlabel('X (µm)')
                 plt.ylabel('Y (µm)')
@@ -629,7 +629,7 @@ class ScanWidget(QtWidgets.QWidget):
                 self.tagger.set_trigger_level(pix_start_ch, 1.2) # Sets the MCL's controller trigger level at 2.5 V.
 
                 # Waveform setup for calibration
-                self.nano.wfma_setup(x_wfm, None, z_wfm, data_points, duration, iter, self.nano.handle)
+                #self.nano.wfma_setup(x_wfm, None, z_wfm, data_points, duration, iter, self.nano.handle)
                 """ read_wfm1 = self.nano.wfma_trigger_and_read(self.nano.handle)
                 original_output = np.ctypeslib.as_array(read_wfm1)  # Convert the read waveform to a numpy array
                 x_out = original_output[0] # Original X output
@@ -641,7 +641,7 @@ class ScanWidget(QtWidgets.QWidget):
 
                 # Send waveform to the MCL Nanodrive
                 self.nano.wfma_setup(x_wfm, None, z_wfm, data_points, duration, iter, self.nano.handle)
-                self.nano.iss_bind_clock_to_axis(1, 2, 3, self.nano.handle)  # Bind clock to WRITE, Changed 7/24/2025
+                self.nano.iss_bind_clock_to_axis(1, 2, 1, self.nano.handle)  # Bind clock to WRITE, Changed 7/24/2025
                 #self.nano.wfma_trigger(self.nano.handle)
                 
                 # Counting events
@@ -731,7 +731,7 @@ class ScanWidget(QtWidgets.QWidget):
                     cmap='hot', 
                     origin='lower',
                     aspect='auto',
-                    extent=[x_min, x_max, z_min, z_max]
+                    extent=[x_min-100, x_max-100, z_min-100, z_max-100]
                 )
                 plt.xlabel('X (µm)')
                 plt.ylabel('Z (µm)')

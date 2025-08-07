@@ -151,3 +151,31 @@ class tt20:
     #frees the Time Tagger object
     def free_time_tagger(self):
         tt.freeTimeTagger(self.tagger)
+
+    def set_in_delay(self, channel, delay):
+        """
+        Sets the input delay for a specific channel.
+        
+        Args:
+            channel (int): The channel number to set the input delay for.
+            delay (float): The delay in nanoseconds.
+        """
+        self.tagger.setInputDelay(channel, delay)
+
+    def measure_correlation(self, channel_1, channel_2, binwidth, n_bins=1000, tagger=None):
+        """
+        Args:
+            tagger (TimeTagger): Time tagger object.
+            channel_1 (int): Channel on which (stop) clicks are received.
+            channel_2 (int): Channel on which reference clicks (start) are
+                            received (when left empty or set to CHANNEL_UNUSED ->
+                            an auto-correlation measurement is performed, which is
+                            the same as setting 'channel_1 = channel_2').
+                            (default: CHANNEL_UNUSED).
+            binwidth (int): Bin width in ps (default: 1000).
+            n_bins (int): The number of bins for the correlation measurement.
+        """
+        if tagger is None:
+            tagger = self.tagger
+        self.correlation = tt.Correlation(tagger, channel_1, channel_2, binwidth, n_bins)
+        #self.correlation.start()
