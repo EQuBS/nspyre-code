@@ -28,6 +28,7 @@ from scipy.signal import convolve, deconvolve
 import os
 
 img_dir = "C:/Users/XieLab/Documents/Confocal_System/Figures/Pixel_Test"
+wfm_dir = "C:/Users/XieLab/Documents/Confocal_System/Figures/Waveforms"
 
 
 sys.path.append('../experiments')
@@ -638,6 +639,9 @@ class ScanWidget(QtWidgets.QWidget):
                 """ # Adjusted waveforms
                 x_corrected = self.adj_wfm("x", x_out, x_wfm)
                 z_corrected = self.adj_wfm("z", z_out, z_wfm) """
+
+                np.save(os.path.join(wfm_dir, "x_wfm.npy"), x_wfm)
+                np.save(os.path.join(wfm_dir, "z_wfm.npy"), z_wfm)
 
                 # Send waveform to the MCL Nanodrive
                 self.nano.wfma_setup(x_wfm, None, z_wfm, data_points, duration, iter, self.nano.handle)

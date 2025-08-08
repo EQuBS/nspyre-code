@@ -1481,7 +1481,7 @@ class MCL_Nanodrive:
         Raises:
             MCL Exception
         """
-        err = self.dll.MCLSequenceStart(handle)
+        err = self.dll.MCL_SequenceStart(handle)
         if err != 0:
             raise MCL_ND_Exceptions(err)
 
@@ -1502,7 +1502,7 @@ class MCL_Nanodrive:
         Raises:
             MCL Exception
         """
-        err = self.dll.MCLSequenceStop(handle)
+        err = self.dll.MCL_SequenceStop(handle)
         if err != 0:
             raise MCL_ND_Exceptions(err)
 
