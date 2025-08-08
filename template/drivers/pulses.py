@@ -1833,10 +1833,10 @@ class Pulses():
         pihalf_y = self.convert_type(round(pihalf_y), float)
         
         def PiPulsesN(axes, tau, N):  
-            wahuha_I_seq = [self.PiHalf('x', pihalf_x)[0], (iq_off2, self.IQ0[0]), self.PiHalf('-y', pihalf_y)[0], (iq_off3, self.IQ0[0]), 
-                        self.PiHalf('y', pihalf_y)[0], (iq_off4, self.IQ0[0]), self.PiHalf('-x', pihalf_x)[0]]
-            wahuha_Q_seq = [self.PiHalf('x', pihalf_x)[1], (iq_off2, self.IQ0[1]), self.PiHalf('-y', pihalf_y)[1], (iq_off3, self.IQ0[1]), 
-                        self.PiHalf('y', pihalf_y)[1], (iq_off4, self.IQ0[1]), self.PiHalf('-x', pihalf_x)[1]]
+        #    wahuha_I_seq = [self.PiHalf('x', pihalf_x)[0], (iq_off2, self.IQ0[0]), self.PiHalf('-y', pihalf_y)[0], (iq_off3, self.IQ0[0]), 
+        #                self.PiHalf('y', pihalf_y)[0], (iq_off4, self.IQ0[0]), self.PiHalf('-x', pihalf_x)[0]]
+        #    wahuha_Q_seq = [self.PiHalf('x', pihalf_x)[1], (iq_off2, self.IQ0[1]), self.PiHalf('-y', pihalf_y)[1], (iq_off3, self.IQ0[1]), 
+        #                self.PiHalf('y', pihalf_y)[1], (iq_off4, self.IQ0[1]), self.PiHalf('-x', pihalf_x)[1]]
             
             tau_half_I_seq = [((tau/2), self.IQ0[0])]
             tau_half_Q_seq = [((tau/2), self.IQ0[1])]
