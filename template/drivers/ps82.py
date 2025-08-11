@@ -20,6 +20,24 @@ class PS82():
         self.ps = PulseStreamer(ip)
         self.last_wfm = []
 
+        """ Some constants by Tian-Xing """
+        # 20250423 calibrated by multimeter and PulseStreamer controller, by Tian-Xing
+        self.IQ0 = [0.0098, 0.0010]
+        self.IQ = self.IQ0
+
+        self.IQpx = [0.497, 0.001]
+        self.IQnx = [-0.479, 0.001]
+
+        self.IQpy = [0.0098, 0.482]
+        self.IQny = [0.0098, -0.481]
+
+            # Here, we force the type of time parameters to be an int type in python
+    # All times variables here are in unit of ns
+    _T = t.TypeVar('_T')
+
+    def convert_type(self, arg: t.Any, converter: _T) -> _T:
+        return converter(arg)
+
     def stream(self,seq,n_runs):
         seq = obtain(seq)
         # print('type(seq) is:', type(seq))
@@ -247,17 +265,6 @@ class PS82():
         self.laser_time = init_time
         self.readout_time = read_time
 
-        """ Some constants by Tian-Xing """
-        # 20250423 calibrated by multimeter and PulseStreamer controller, by Tian-Xing
-        self.IQ0 = [0.0098, 0.0010]
-        self.IQ = self.IQ0
-
-        self.IQpx = [0.497, 0.001]
-        self.IQnx = [-0.479, 0.001]
-
-        self.IQpy = [0.0098, 0.482]
-        self.IQny = [0.0098, -0.481]
-
 
         ## we can measure the pi time on x and on y.
         ## they should be the same, but they technically
@@ -279,10 +286,80 @@ class PS82():
                 #mw_Q_on = (iq_on, self.IQpy[1])
             
             #return mw_I_on, mw_Q_on
+        
+        def SinglePulsed_ODMR():
+            '''
+            CREATE SINGLE RABI SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
+            '''
 
-        # Here, we force the type of time parameters to be an int type in python
-    # All times variables here are in unit of ns
-    _T = t.TypeVar('_T')
+            '''
+            DEFINE SPECIAL TIME INTERVALS FOR EXPERIMENT
 
-    def convert_type(self, arg: t.Any, converter: _T) -> _T:
-        return converter(arg)
+            pad_time: padding time to equalize duration of every run (for different vsg_on durations)
+            '''
+            #pad_time = 50000 - self.laser_lag - self.laser_time - self.singlet_decay - pi_time - self.MW_buffer_time - self.readout_time 
+            #pad_time = 50000 - self.laser_lag - self.laser_time - wait_time - pi_time - self.MW_buffer_time - read_wait - self.readout_time
+            pad_time= 200
+
+            init_laser_time = self.laser_time
+            laser_off1 = wait_time + pi_time + self.MW_buffer_time + read_wait
+            laser_off2 = 200 + pad_time + seq_gap
+            self.total_time = init_laser_time + laser_off1 + self.readout_time + laser_off2
+
+            # mw I & Q off windows
+            
+            iq_off1 = self.laser_lag + self.laser_time + wait_time
+            iq_off2 = self.MW_buffer_time + read_wait + self.readout_time + laser_off2 - self.laser_lag
+
+            # DAQ trigger windows
+            clock_off1 = self.laser_lag + self.laser_time + laser_off1
+            clock_off_readout = self.readout_time - 2*self.clock_time
+            clock_off2 = laser_off2 - self.laser_lag
+            '''
+            DEFINE RELEVANT ON, OFF TIMES FOR DEVICES
+            '''
+            
+            '''
+            CONSTRUCT PULSE SEQUENCE
+            '''
+            # create sequence objects for MW on and off blocks
+            seq_on = self.ps.createSequence()
+            seq_off = self.ps.createSequence()
+
+            # define sequence structure for laser
+
+            laser_seq = [(init_laser_time, 1), (laser_off1, 0), (self.readout_time, 1), (laser_off2, 0)]
+
+  
+            # define sequence structure for DAQ
+            daq_clock_seq = [(clock_off1, 0), (self.clock_time, 1), (clock_off_readout, 0), (self.clock_time, 1), (clock_off2, 0)]
+
+            mw_I_on_seq = [(iq_off1, self.IQ0[0]), (pi_time, self.IQ_ON[0]), (iq_off2, self.IQ0[0])]
+            mw_Q_on_seq = [(iq_off1, self.IQ0[1]), (pi_time, self.IQ_ON[1]), (iq_off2, self.IQ0[1])]
+
+            # when MW = OFF
+            mw_I_off_seq = [(iq_off1, self.IQ0[0]), (pi_time, self.IQ0[0]), (iq_off2, self.IQ0[0])]
+            mw_Q_off_seq = [(iq_off1, self.IQ0[1]), (pi_time, self.IQ0[1]), (iq_off2, self.IQ0[1])]
+
+            # assign sequences to respective channels for seq_on
+            seq_on.setDigital(self.channel_dict["laser"], laser_seq) # laser 
+            seq_on.setDigital(self.channel_dict["clock"], daq_clock_seq) # integrator trigger
+            # seq_on.setDigital(1, switch_on_seq) # RF control switch
+            seq_on.setAnalog(0, mw_I_on_seq) # mw_I
+            seq_on.setAnalog(1, mw_Q_on_seq) # mw_Q
+            
+            # assign sequences to respective channels for seq_off
+            seq_off.setDigital(self.channel_dict["laser"], laser_seq) # laser
+            seq_off.setDigital(self.channel_dict["clock"], daq_clock_seq) # integrator trigger
+            # seq_off.setDigital(1, switch_off_seq) # RF control switch
+            seq_off.setAnalog(0, mw_I_off_seq) # mw_I
+            seq_off.setAnalog(1, mw_Q_off_seq) # mw_Q
+            return seq_on + seq_off
+
+        seqs = self.ps.createSequence()
+        seqs = SinglePulsed_ODMR()
+        # for i in range(runs):
+        #     seqs += SinglePulsed_ODMR()
+
+        return seqs
+
