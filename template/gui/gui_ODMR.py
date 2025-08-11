@@ -17,7 +17,7 @@ from nspyre import ExperimentWidget
 from nspyre import DataSink
 from pyqtgraph import SpinBox
 from pyqtgraph.Qt import QtWidgets
-import spin_measurements as sm
+from . import spin_measurements as sm
 # import the experiment 
 import sys
 sys.path.append('../experiments')

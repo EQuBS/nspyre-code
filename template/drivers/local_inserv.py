@@ -38,10 +38,11 @@ with InstrumentServer() as inserv, InstrumentGateway(port=42068) as gw:
     inserv.add('ps', _HERE / 'ps82.py', 'PS82') # inserv.add('ps', _HERE / 'ps82.py', 'PS82', args=['169.254.8.2']); inserv.add('ps', "C:\\Users\\XieLab\\Documents\\Confocal_System\\Drive_template-main\\template-main\\src\\template\\driversTX\\pulses.py", 'Pulses')
     inserv.add('daq', _HERE / 'TimeTaggerDriver.py', 'tt20')
     inserv.add('nano', _HERE / 'MCL_Madlib_Wrapper.py', 'MCL_Nanodrive') # Rolando added this 7/3/2025
-    #inserv.add('sg', _HERE / 'srs.py', 'SG396', args=["TCPIP0::169.254.50.253::inst0::INSTR"])
+    inserv.add('sg', _HERE / 'srs_386.py', 'SG386', args=["TCPIP0::169.254.50.253::inst0::INSTR"])
     # run a CLI (command-line interface) that allows the user to enter
     # commands to control the server
     serve_instrument_server_cli(inserv)
+    
 
 
 

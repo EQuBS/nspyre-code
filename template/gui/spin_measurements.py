@@ -620,7 +620,7 @@ class SpinMeasurements:
             # set initial parameters for instrument server devices
             # Turn on the laser
             gw.ps.laser_on()
-            gw.laser.las_mode()
+            gw.laser.cw_mode()
             gw.laser.on()
 
             # Set the correct Signal Generator
@@ -639,7 +639,7 @@ class SpinMeasurements:
                 # else:
                 #     ps_seq = gw.ps.Pulsed_ODMR(kwargs['xy'], kwargs['pi']) # pulse streamer sequence for Pulsed ODMR
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
-                gw.sg.set_mod_type('QAM')
+                gw.sg.set_mod_type('IQ')
                 gw.sg.set_rf_toggle(1)
                 gw.sg.set_mod_toggle(1)
                 gw.sg.set_mod_function('external')
@@ -654,9 +654,9 @@ class SpinMeasurements:
                 # else:
                 #     ps_seq = gw.ps.Pulsed_ODMR(kwargs['xy'], kwargs['pi']) # pulse streamer sequence for Pulsed ODMR
             
-                gw.windfreak.set_power_ch0(kwargs['mw_power'])
+                #gw.windfreak.set_power_ch0(kwargs['mw_power'])
                 #gw.windfreak.set_freq_ch0(kwargs['freq'])
-                gw.windfreak.ch0_on()
+                #gw.windfreak.ch0_on()
             else:
                 raise ValueError("\nWe only have Signal Generators: SRS or WindFreak!\n")
             ## TXZ & Evan: Found that the class variable cannot be updated by doing this "gw.ps.[class variable] = XXX", maybe this is nspyre's protection
@@ -681,8 +681,8 @@ class SpinMeasurements:
                     for f, freq in enumerate(frequencies):
                         if kwargs['odmr_sg'] == 'SRS':
                             gw.sg.set_frequency(freq) # set particular SG396 frequency
-                        elif kwargs['odmr_sg'] == 'WindFreak':
-                            gw.windfreak.set_freq_ch0(freq)
+                        #elif kwargs['odmr_sg'] == 'WindFreak':
+                            #gw.windfreak.set_freq_ch0(freq)
                         else:
                             raise ValueError("\nWe only have Signal Generators: SRS or WindFreak!\n")
                         

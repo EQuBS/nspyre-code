@@ -2,6 +2,7 @@ from pulsestreamer import PulseStreamer, Sequence, OutputState
 import numpy as np
 import time
 from rpyc.utils.classic import obtain
+import typing as t
 
 class PS82():
     def __init__(self):
@@ -180,3 +181,108 @@ class PS82():
         seq.setDigital(self.channel_dict["laser"], laser_on_seq)
 
         return seq
+    
+    """ 
+    Rolando A. Fimbres G. 8/8/2025
+
+    The following function comes from Tian-Xing's script 'pulses.py' driver; modif. adapt.
+    """
+
+    def CW_ODMR(self, runs, probe_time):
+        '''
+        CW ODMR Sequence
+        Laser on for entire sequence. 
+        MW on for probe_time.
+        MW off for probe_time.
+        Tian-Xing  Zheng, Sept.21.2023
+        '''
+        #print('\n runs in CW_ODMR() = ', runs)
+        # create sequence object
+        seq = self.ps.createSequence()
+        
+        # set DAQ trigger off time based on optimal readout window during MW on/off window
+        clock_on = self.clock_time
+        clock_off = probe_time - self.clock_time
+
+        iq_on = probe_time 
+        iq_off = probe_time
+
+        # define sequence structure for clock and MW I/Q channels
+        #daq_clock_seq = [(clock_off1, 0), (clock_on, 1), (clock_off2, 0), (clock_on, 1), (clock_off3, 0)]
+        daq_clock_seq = [(clock_on, 1), (clock_off, 0), (clock_on, 1), (clock_off, 0)]*runs
+        mw_I_seq = [(iq_on, self.IQpx[0]), (iq_off, self.IQ0[0])]*runs
+        mw_Q_seq = [(iq_on, self.IQpx[1]), (iq_off, self.IQ0[1])]*runs
+
+        # Last clock to collect for the last point in the run        
+        daq_clock_seq += [(self.clock_time, 1)]
+        mw_I_seq += [(self.clock_time, self.IQ0[0])]
+        mw_Q_seq += [(self.clock_time, self.IQ0[1])]
+
+        # Makre sure the laser trigger is on while ps is streaming the sequence, this is only for fixing the bug of DLnsec laser
+        laser_on_seq = [(probe_time*runs + self.clock_time, 1)]
+        seq.setDigital(self.channel_dict["laser"], laser_on_seq)
+
+        # assign sequences to respective channels
+        seq.setDigital(self.channel_dict['clock'], daq_clock_seq) # DAQ clock -- record data
+        # seq.setDigital(1, switch_seq) # RF switch
+        seq.setAnalog(0, mw_I_seq) # mw_I
+        seq.setAnalog(1, mw_Q_seq) # mw_Q
+
+        return seq
+    
+    """
+    Rolando A. Fimbres G. 8/8/2025
+    
+    The following function comes from Tian-Xing's script 'pulses.py' driver; modif. adapt.
+    """
+
+    def Pulsed_ODMR(self, pi_xy, pi_time, runs, init_time, read_time, wait_time, read_wait, seq_gap):
+        '''
+        Pulsed ODMR sequence by Tengyang and Hanyan, Nov.2024
+        Need to test it on an known sample
+        '''
+        ## Run a pi pulse, then measure the signal
+        ## and reference counts from NV.
+        pi_time = self.convert_type(round(pi_time), float)
+        self.laser_time = init_time
+        self.readout_time = read_time
+
+        """ Some constants by Tian-Xing """
+        # 20250423 calibrated by multimeter and PulseStreamer controller, by Tian-Xing
+        self.IQ0 = [0.0098, 0.0010]
+        self.IQ = self.IQ0
+
+        self.IQpx = [0.497, 0.001]
+        self.IQnx = [-0.479, 0.001]
+
+        self.IQpy = [0.0098, 0.482]
+        self.IQny = [0.0098, -0.481]
+
+
+        ## we can measure the pi time on x and on y.
+        ## they should be the same, but they technically
+        ## have different offsets on our pulse streamer.
+        if pi_xy == 'x':
+            self.IQ_ON = self.IQpx
+        elif pi_xy == 'y':
+            self.IQ_ON = self.IQpy
+        else:
+            raise ValueError("pi_xy must be 'x' or 'y'!")
+        #def Pi(axis):
+            #iq_on = pi_time 
+            
+            #if axis == 'x':
+                #mw_I_on = (iq_on, self.IQpx[0])
+                #mw_Q_on = (iq_on, self.IQpx[1])
+            #else:
+                #mw_I_on = (iq_on, self.IQpy[0])
+                #mw_Q_on = (iq_on, self.IQpy[1])
+            
+            #return mw_I_on, mw_Q_on
+
+        # Here, we force the type of time parameters to be an int type in python
+    # All times variables here are in unit of ns
+    _T = t.TypeVar('_T')
+
+    def convert_type(self, arg: t.Any, converter: _T) -> _T:
+        return converter(arg)

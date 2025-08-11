@@ -43,7 +43,7 @@ from math import log10
 def W_to_dBm(power):
     return 10*log10(1000*power)
 
-class SG396:
+class SG386:
     DEFAULTS = {
         'COMMON': {
             'write_termination': '\r\n',
@@ -57,9 +57,7 @@ class SG396:
         ('Sweep', 3),
         ('Pulse', 4),
         ('Blank', 5),
-        ('QAM', 7),
-        ('CPM', 8),
-        ('VSB', 9)
+        ('IQ', 6),
     ])
     MODULATION_FUNCTION = OrderedDict([
         ('sine', 0),

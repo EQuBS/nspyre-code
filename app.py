@@ -32,6 +32,8 @@ import template.gui.spin_measurements
 import template.gui.gui_Nano
 import template.gui.gui_Scan
 import template.gui.gui_ScanXZ
+import template.gui.gui_ODMR
+import template.gui.spin_measurements as sm
 from template.drivers.TimeTaggerDriver import tt20
 
 #print(template.gui.spin_measurements.__file__)
@@ -84,7 +86,7 @@ def main():
         # Create the GUI.
         main_widget = MainWidget(
             {
-                'ODMR': MainWidgetItem(template.gui.elements, 'ODMRWidget', stretch=(1, 1)),
+                'ODMR_sim': MainWidgetItem(template.gui.elements, 'ODMRWidget', stretch=(1, 1)),
                 'T1': MainWidgetItem(template.gui.gui_T1, 'T1Widget', stretch=(1, 1)),
                 'DLnsec': MainWidgetItem(template.gui.gui_dlnsec, 'DLnsecWidget', args=[laser_driver, pulse_streamer_driver], stretch=(1, 1)),
                 'I-t': MainWidgetItem(template.gui.gui_SigVsTime, 'SigVsTimeWidget', stretch=(1, 1)),
@@ -92,6 +94,7 @@ def main():
                 'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano], stretch=(1, 1)),
                 'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
                 'XZ-Scan': MainWidgetItem(template.gui.gui_ScanXZ, 'ScanXZ', stretch=(1, 1)),
+                'ODMR': MainWidgetItem(template.gui.gui_ODMR, 'ODMR_Widget', stretch=(1, 1)),
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(
                         template.gui.elements,
@@ -111,6 +114,11 @@ def main():
                     'ScanPlot': MainWidgetItem(
                         template.gui.gui_Scan,
                         'ScanPlotWidget',
+                        stretch=(100, 100),
+                    ),
+                    'ODMRPlot': MainWidgetItem(
+                        template.gui.gui_ODMR,
+                        'FlexLinePlotWidgetWithODMR',
                         stretch=(100, 100),
                     ),
                 },
