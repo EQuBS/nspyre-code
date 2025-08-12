@@ -629,6 +629,7 @@ class SpinMeasurements:
                 if kwargs['odmr_type'] == 'CW':
                     #gw.ps.probe_time = kwargs['probe_time'] * 1e9 # change unit to ns
                     ps_seq = gw.ps.CW_ODMR(kwargs['runs'], kwargs['probe_time'] * 1e9) # pulse streamer sequence for CW ODMR
+                    samp_time = kwargs['runs']*kwargs['probe_time']*1e9
                     print('\nCW ODMR sequence generated!\n')
                 elif kwargs['odmr_type']=='Pulsed':
                     #pi_xy, pi_time = kwargs['pi_xy'], kwargs['pi_time']*1e9 # these two parameters come from gui
@@ -642,8 +643,8 @@ class SpinMeasurements:
                 gw.sg.set_mod_type('IQ')
                 gw.sg.set_rf_toggle(1)
                 gw.sg.set_mod_toggle(1)
-                gw.sg.set_mod_function('external')
-                
+                gw.sg.set_mod_function('ramp') #set modulation function from external to ramp
+
             elif kwargs['odmr_sg'] == 'WindFreak':
                 # Pulse Stramer Sequence
                 if kwargs['odmr_type'] == 'CW':
@@ -691,7 +692,8 @@ class SpinMeasurements:
                         if kwargs['odmr_type']=='CW':
                             #TXZ: Here we set the # of runs to be 1, because we put the actual runs into the sequence directly
                             ### This self.read the the most "important" function, which let the pulse streamer starting streaming the seq and let the DAQ read data ####
-                            odmr_result = self.read(odmr_buffer[0], ps_seq, 1) # read samples to buffer
+                            #odmr_result = self.read(odmr_buffer[0], ps_seq, 1, gw) # read samples to buffer
+                            odmr_result = self.read(odmr_buffer[0], samp_time, 1, gw)
                             sig, bg = self.digital_math(odmr_result, 'ODMR')
                         elif kwargs['odmr_type']=='Pulsed':
                             # Here since the Pulses_ODMR function inside pulses.py only generate the sequence for 1 run
