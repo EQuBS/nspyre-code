@@ -623,6 +623,8 @@ class SpinMeasurements:
             gw.laser.cw_mode()
             gw.laser.on()
 
+            gw.daq.set_trigger_level(3, 1.1) # set trigger level for Time Tagger
+
             # Set the correct Signal Generator
             if kwargs['odmr_sg'] == 'SRS':
                 # Pulse Stramer Sequence
@@ -630,10 +632,12 @@ class SpinMeasurements:
                     #gw.ps.probe_time = kwargs['probe_time'] * 1e9 # change unit to ns
                     ps_seq = gw.ps.CW_ODMR(kwargs['runs'], kwargs['probe_time'] * 1e9) # pulse streamer sequence for CW ODMR
                     samp_time = kwargs['runs']*kwargs['probe_time']*1e9
+                    gw.ps.gate_on_cw_odmr() # Opening the SPCM's gate, 8/12/2025 Very possible to be changed
                     print('\nCW ODMR sequence generated!\n')
                 elif kwargs['odmr_type']=='Pulsed':
                     #pi_xy, pi_time = kwargs['pi_xy'], kwargs['pi_time']*1e9 # these two parameters come from gui
                     ps_seq = gw.ps.Pulsed_ODMR(kwargs['xy'], kwargs['pi_time']*1e9, kwargs['runs'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9, kwargs['seq_gap']*1e9)
+                    samp_time = 2 * (1000 + kwargs['init_time'] + kwargs['wait_time'] + kwargs['init_time'] + kwargs['pi_time'] + kwargs['read_wait'] + kwargs['seq_gap']) 
                     print('\nPulsed ODMR sequence generated!\n')
                 else:
                     raise ValueError("\nOnly CW or Pulsed ODMR!\n")
@@ -664,8 +668,7 @@ class SpinMeasurements:
             ## TXZ & Evan: If you really want to change the class variable, you need to write a funtion inside the class for changing the class variable
             #gw.ps.clock_time = 10 # [ns] width of our clock pulse.
             #gw.ps.runs = kwargs['runs'] #number of runs per point
-            #print("\n gw.ps.runs:", gw.ps.runs)
-            gw.daq.set_trigger_level(3, 1.1) # set trigger level for DAQ 
+            #print("\n gw.ps.runs:", gw.ps.runs) 
 
             with tqdm(total = kwargs['iterations']) as pbar:
 
@@ -697,7 +700,7 @@ class SpinMeasurements:
                             sig, bg = self.digital_math(odmr_result, 'ODMR')
                         elif kwargs['odmr_type']=='Pulsed':
                             # Here since the Pulses_ODMR function inside pulses.py only generate the sequence for 1 run
-                            odmr_result = self.read(odmr_buffer[0], ps_seq, kwargs['runs'])
+                            odmr_result = self.read(odmr_buffer[0], ps_seq, kwargs['runs'], gw)
                             sig, bg = self.digital_math(odmr_result, 'Pulsed ODMR', 1)
 
                         # record the photon counts
@@ -720,7 +723,7 @@ class SpinMeasurements:
                             gw.daq.free_time_tagger()
                             gw.sg.set_rf_toggle(0)
                             gw.sg.set_mod_toggle(0)
-                            gw.ps.Pulser.reset()
+                            gw.ps.ps_reset()
                             gw.laser.off()
                             print('the GUI has asked us nicely to exit')
                             return
@@ -728,11 +731,12 @@ class SpinMeasurements:
                     pbar.update(1)
 
                 # close DAQ task + reset SG396 and PS parameters
-                gw.daq.free_time_tagger()
+                #gw.daq.free_time_tagger()
                 gw.sg.set_rf_toggle(0)
                 gw.sg.set_mod_toggle(0)
-                gw.ps.Pulser.reset()
+                gw.ps.ps_reset()
                 gw.laser.off()
+                gw.ps.gate_off() # Closing the SPCM's gate
 
     #ODMR_2Dsweeping
     def odmr_run_with_2d_scan(self, **kwargs):

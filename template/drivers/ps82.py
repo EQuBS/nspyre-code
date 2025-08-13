@@ -16,6 +16,9 @@ class PS82():
         self.channel_dict = {"clock": 0, "laser": 7, "switch": 2, "gate":3, "": 4, "": 5, "": 6, "": 1, "": None} # Change done by Rolando in PS channel dictionary.
         self.clock_time = 10
         self.sampling_time = 50000
+        self.laser_lag = 130
+        self.MW_buffer_time = 200
+        self.readout_time = 400 
         ip="169.254.8.2"
         self.ps = PulseStreamer(ip)
         self.last_wfm = []
@@ -178,7 +181,10 @@ class PS82():
     def gate_off(self):
         # Gate AND Laser OFF
         return self.ps.constant(OutputState([], 0.0, 0.0))
-
+    
+    def gate_on_cw_odmr(self):
+        # Gate on for the ODMR (CW) experiment
+        return self.ps.constant(OutputState([self.channel_dict["gate"]], 0.0, 0.0))
     """
     The following function was copied from pulses.py as a test.
     - Rolando
@@ -261,7 +267,9 @@ class PS82():
         '''
         ## Run a pi pulse, then measure the signal
         ## and reference counts from NV.
-        pi_time = self.convert_type(round(pi_time), float)
+        pi_time = self.convert_type(round(pi_time), float) # Check. Maybe this causes the Sig. gen's parser error. 8/12/2025
+        # In case another parser error occurs, we could maybe try defining 'pi_time' as:
+        #pi_time = float(pi_time)
         self.laser_time = init_time
         self.readout_time = read_time
 
@@ -362,4 +370,7 @@ class PS82():
         #     seqs += SinglePulsed_ODMR()
 
         return seqs
+
+    def ps_reset(self):
+        self.ps.reset()
 
