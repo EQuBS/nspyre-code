@@ -647,13 +647,13 @@ class SpinMeasurements:
                 #     ps_seq = gw.ps.Pulsed_ODMR(kwargs['xy'], kwargs['pi']) # pulse streamer sequence for Pulsed ODMR
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
                 time.sleep(0.1)
-                gw.sg.set_mod_type('IQ')
+                #gw.sg.set_mod_type('IQ') # Commented for testing purposes 8/14/2025
                 time.sleep(0.1)
                 gw.sg.set_rf_toggle(1)
                 time.sleep(0.1)
-                gw.sg.set_mod_toggle(1)
+                #gw.sg.set_mod_toggle(1) # Commented for testing purposes 8/14/2025
                 time.sleep(0.1)
-                gw.sg.set_mod_function('ramp') #set modulation function from external to ramp
+                #gw.sg.set_mod_function('ramp') #set modulation function from external to ramp; Commented for testing purposes 8/14/2025
 
             elif kwargs['odmr_sg'] == 'WindFreak':
                 # Pulse Stramer Sequence
@@ -729,7 +729,7 @@ class SpinMeasurements:
                             gw.daq.free_time_tagger()
                             gw.sg.set_rf_toggle(0)
                             time.sleep(0.1)
-                            gw.sg.set_mod_toggle(0)
+                            #gw.sg.set_mod_toggle(0) # Commented for testing purposes 8/14/2025
                             gw.ps.ps_reset()
                             gw.laser.off()
                             print('the GUI has asked us nicely to exit')
@@ -740,7 +740,7 @@ class SpinMeasurements:
                 # close DAQ task + reset SG396 and PS parameters
                 #gw.daq.free_time_tagger()
                 gw.sg.set_rf_toggle(0)
-                gw.sg.set_mod_toggle(0)
+                #gw.sg.set_mod_toggle(0) # Commented for testing purposes 8/14/2025
                 gw.ps.ps_reset()
                 gw.laser.off()
                 #gw.ps.gate_off() # Closing the SPCM's gate
