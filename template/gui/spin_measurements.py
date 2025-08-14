@@ -606,7 +606,9 @@ class SpinMeasurements:
             if odmr_buffer_size < 2:
                 raise ValueError("Buffer size too small.")
 
-            ni_sample_buffer = np.ascontiguousarray(np.zeros(odmr_buffer_size), dtype = np.uint32)
+            odmr_buffer_size_test = kwargs['runs'] # This is the test buffer size 8/13/2025
+
+            ni_sample_buffer = np.ascontiguousarray(np.zeros(odmr_buffer_size_test), dtype = np.uint32) # Uses test buffer size
             odmr_buffer = [ni_sample_buffer]
 
             np.set_printoptions(precision = 6)
@@ -630,23 +632,27 @@ class SpinMeasurements:
                 # Pulse Stramer Sequence
                 if kwargs['odmr_type'] == 'CW':
                     #gw.ps.probe_time = kwargs['probe_time'] * 1e9 # change unit to ns
-                    ps_seq = gw.ps.CW_ODMR(kwargs['runs'], kwargs['probe_time'] * 1e9) # pulse streamer sequence for CW ODMR
-                    samp_time = kwargs['runs']*kwargs['probe_time']*1e9
-                    gw.ps.gate_on_cw_odmr() # Opening the SPCM's gate, 8/12/2025 Very possible to be changed
+                    gw.ps.CW_ODMR(kwargs['runs'], kwargs['probe_time'] * 1e9) # pulse streamer sequence for CW ODMR, 8/13/2025 was defined as ps_seq
+                    samp_time = int(kwargs['runs']*kwargs['probe_time']*1e9)
+                    #gw.ps.gate_on_cw_odmr() # Opening the SPCM's gate, 8/12/2025 Very possible to be changed
                     print('\nCW ODMR sequence generated!\n')
                 elif kwargs['odmr_type']=='Pulsed':
                     #pi_xy, pi_time = kwargs['pi_xy'], kwargs['pi_time']*1e9 # these two parameters come from gui
-                    ps_seq = gw.ps.Pulsed_ODMR(kwargs['xy'], kwargs['pi_time']*1e9, kwargs['runs'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9, kwargs['seq_gap']*1e9)
-                    samp_time = 2 * (1000 + kwargs['init_time'] + kwargs['wait_time'] + kwargs['init_time'] + kwargs['pi_time'] + kwargs['read_wait'] + kwargs['seq_gap']) 
+                    gw.ps.Pulsed_ODMR(kwargs['xy'], kwargs['pi_time']*1e9, kwargs['runs'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9, kwargs['seq_gap']*1e9) # 8/13/2025 was defined as ps_seq
+                    samp_time = int(2 * (1000 + kwargs['init_time'] + kwargs['wait_time'] + kwargs['init_time'] + kwargs['pi_time'] + kwargs['read_wait'] + kwargs['seq_gap']))
                     print('\nPulsed ODMR sequence generated!\n')
                 else:
                     raise ValueError("\nOnly CW or Pulsed ODMR!\n")
                 # else:
                 #     ps_seq = gw.ps.Pulsed_ODMR(kwargs['xy'], kwargs['pi']) # pulse streamer sequence for Pulsed ODMR
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
+                time.sleep(0.1)
                 gw.sg.set_mod_type('IQ')
+                time.sleep(0.1)
                 gw.sg.set_rf_toggle(1)
+                time.sleep(0.1)
                 gw.sg.set_mod_toggle(1)
+                time.sleep(0.1)
                 gw.sg.set_mod_function('ramp') #set modulation function from external to ramp
 
             elif kwargs['odmr_sg'] == 'WindFreak':
@@ -700,7 +706,7 @@ class SpinMeasurements:
                             sig, bg = self.digital_math(odmr_result, 'ODMR')
                         elif kwargs['odmr_type']=='Pulsed':
                             # Here since the Pulses_ODMR function inside pulses.py only generate the sequence for 1 run
-                            odmr_result = self.read(odmr_buffer[0], ps_seq, kwargs['runs'], gw)
+                            odmr_result = self.read(odmr_buffer[0], samp_time, kwargs['runs'], gw)
                             sig, bg = self.digital_math(odmr_result, 'Pulsed ODMR', 1)
 
                         # record the photon counts
@@ -722,6 +728,7 @@ class SpinMeasurements:
                         if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
                             gw.daq.free_time_tagger()
                             gw.sg.set_rf_toggle(0)
+                            time.sleep(0.1)
                             gw.sg.set_mod_toggle(0)
                             gw.ps.ps_reset()
                             gw.laser.off()
@@ -736,7 +743,7 @@ class SpinMeasurements:
                 gw.sg.set_mod_toggle(0)
                 gw.ps.ps_reset()
                 gw.laser.off()
-                gw.ps.gate_off() # Closing the SPCM's gate
+                #gw.ps.gate_off() # Closing the SPCM's gate
 
     #ODMR_2Dsweeping
     def odmr_run_with_2d_scan(self, **kwargs):

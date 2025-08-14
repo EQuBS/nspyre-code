@@ -267,9 +267,9 @@ class PS82():
         '''
         ## Run a pi pulse, then measure the signal
         ## and reference counts from NV.
-        pi_time = self.convert_type(round(pi_time), float) # Check. Maybe this causes the Sig. gen's parser error. 8/12/2025
+        #pi_time = self.convert_type(round(pi_time), float) # Check. Maybe this causes the Sig. gen's parser error. 8/12/2025
         # In case another parser error occurs, we could maybe try defining 'pi_time' as:
-        #pi_time = float(pi_time)
+        pi_time = int(pi_time) # 8/13/2025 changed to int() given that times in pulse patterns are required to be integers.
         self.laser_time = init_time
         self.readout_time = read_time
 
