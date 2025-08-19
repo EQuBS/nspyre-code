@@ -598,6 +598,8 @@ class SpinMeasurements:
     def odmr_run(self, **kwargs):
         '''
         Developed by Tian-Xing in Sept.2023
+
+        Slight modifications for EQuBS Lab (still based on Tian-Xing's work) by Rolando, August 2025.
         '''
         with InstrumentGateway() as gw, DataSource(kwargs['dataset']) as odmr_data:
 
