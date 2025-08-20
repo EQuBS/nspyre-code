@@ -238,3 +238,47 @@ class SG386:
 
     def calibrate(self):
         logger.info("SG396 calibration succeeded.")
+
+    def get_sfunction(self):
+        """Get the Sweep Modulation Function"""
+        return self.device.query('SFNC?')
+    
+    def set_sfunction(self, value):
+        """Set the Sweep Modulation Function"""
+        allowed = (0, 1, 2, 5)
+        # If value is a string, map it to its integer using the dictionary
+        if isinstance(value, str):
+            value_int = self.MODULATION_FUNCTION.get(value)
+        else:
+            value_int = value
+            # Find the key for this value_int
+            key = next((k for k, v in self.MODULATION_FUNCTION.items() if v == value_int), str(value_int))
+        if value_int not in allowed:
+            logger.error(f"Invalid Sweep Modulation Function: {value} (mapped: {value_int})")
+            raise ValueError("Value must be 0, 1, 2, or 5 (or their string keys).")
+        self.device.write(f"SFNC {value_int}")
+        logger.info(f"Set Sweep Modulation Function to {key} ({value_int})")
+
+    def get_srate(self):
+        """Get the Sweep Rate"""
+        return (self.device.query('SRAT?'))
+
+    def set_srate(self, value):
+        """Set the Sweep Rate"""
+        if not (1e-6 <= value <= 120):
+            logger.error(f"Sweep Rate {value} is out of allowed range [1e-6, 120] Hz.")
+            raise ValueError("Sweep Rate must be between 1e-6 and 120 Hz.")
+        self.device.write(f"SRAT {value}")
+        logger.info(f"Set Sweep Rate to {value}")
+
+    def get_sdeviation(self):
+        """Get the Sweep Deviation"""
+        return (self.device.query('SDEV?'))
+
+    def set_sdeviation(self, value):
+        """Set the Sweep Deviation"""
+        if not (0.1 <= value <= 1e9):
+            logger.error(f"Sweep Deviation {value} is out of allowed range [0.1, 1e9] Hz.")
+            raise ValueError("Sweep Deviation must be between 0.1 and 1e9 Hz.")
+        self.device.write(f"SDEV {value}")
+        logger.info(f"Set Sweep Deviation to {value}")
