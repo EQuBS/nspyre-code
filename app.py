@@ -33,6 +33,7 @@ import template.gui.gui_Nano
 import template.gui.gui_Scan
 import template.gui.gui_ScanXZ
 import template.gui.gui_ODMR
+import template.gui.gui_Rabi
 import template.gui.spin_measurements as sm
 from template.drivers.TimeTaggerDriver import tt20
 
@@ -95,6 +96,7 @@ def main():
                 'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
                 'XZ-Scan': MainWidgetItem(template.gui.gui_ScanXZ, 'ScanXZ', stretch=(1, 1)),
                 'ODMR': MainWidgetItem(template.gui.gui_ODMR, 'ODMR_Widget', stretch=(1, 1)),
+                'Rabi': MainWidgetItem(template.gui.gui_Rabi, 'Rabi_Widget', stretch=(1, 1)),
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(
                         template.gui.elements,

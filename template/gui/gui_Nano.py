@@ -17,13 +17,15 @@ class NanoWidget(QtWidgets.QWidget):
             nano_driver: The MCL Nanodrive driver.
         """
         super().__init__()
-        self.nano = nano
-        """ if nano is None or handle is None:
+        """ #self.nano = nano
+        if nano is None or handle is None:
             self.nano = MCL_Nanodrive()
             self.handle = self.nano.init_handle()
         else:
             self.nano = nano
-            self.handle = handle """
+            self.handle = handle  """
+        
+        #handle = nano.init_handle()
 
         # top level layout
         layout = QtWidgets.QGridLayout()
@@ -55,9 +57,9 @@ class NanoWidget(QtWidgets.QWidget):
         # Button to read the current position
         read_button = QtWidgets.QPushButton('Read Position')
         def read_position(button):
-            x = self.nano.single_read_n(1, self.nano.handle)
-            y = self.nano.single_read_n(2, self.nano.handle)
-            z = self.nano.single_read_n(3, self.nano.handle)
+            x = self.nano.single_read_n(1, self.nano.handle) #self.nano.handle
+            y = self.nano.single_read_n(2, self.nano.handle) #self.nano.handle
+            z = self.nano.single_read_n(3, self.nano.handle) #self.nano.handle
             self.x_pos_box.setText(f"{-100+(x):.4f}")
             self.y_pos_box.setText(f"{-100+(y):.4f}")
             self.z_pos_box.setText(f"{-100+(z):.4f}")

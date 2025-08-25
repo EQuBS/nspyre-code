@@ -608,9 +608,9 @@ class SpinMeasurements:
             if odmr_buffer_size < 2:
                 raise ValueError("Buffer size too small.")
 
-            odmr_buffer_size_test = kwargs['runs'] # This is the test buffer size 8/13/2025
+            odmr_buffer_size_test = 1 #kwargs['runs'] # This is the test buffer size 8/13/2025
 
-            ni_sample_buffer = np.ascontiguousarray(np.zeros(odmr_buffer_size_test), dtype = np.uint32) # Uses test buffer size
+            ni_sample_buffer = np.zeros(odmr_buffer_size_test, dtype = np.uint32) # Uses test buffer size;removed np.ascontiguousarray() that formats to more efficient C array when taking multiple points per frequency,bin
             odmr_buffer = [ni_sample_buffer]
 
             np.set_printoptions(precision = 6)
@@ -635,8 +635,8 @@ class SpinMeasurements:
                 if kwargs['odmr_type'] == 'CW':
                     #gw.ps.probe_time = kwargs['probe_time'] * 1e9 # change unit to ns
                     gw.ps.CW_ODMR(kwargs['runs'], kwargs['probe_time'] * 1e9) # pulse streamer sequence for CW ODMR, 8/13/2025 was defined as ps_seq
-                    samp_time = int(kwargs['runs']*kwargs['probe_time']*1e9)
-                    #gw.ps.gate_on_cw_odmr() # Opening the SPCM's gate, 8/12/2025 Very possible to be changed
+                    samp_time = 5*1e7 #int(kwargs['runs']*kwargs['probe_time']*1e9)
+                    gw.ps.gate_on_cw_odmr() # Opening the SPCM's gate, 8/12/2025 Very possible to be changed
                     print('\nCW ODMR sequence generated!\n')
                 elif kwargs['odmr_type']=='Pulsed':
                     #pi_xy, pi_time = kwargs['pi_xy'], kwargs['pi_time']*1e9 # these two parameters come from gui
@@ -650,11 +650,11 @@ class SpinMeasurements:
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
                 time.sleep(0.1)
                 #gw.sg.set_mod_type('IQ') # Commented for testing purposes 8/14/2025
-                time.sleep(0.1)
+                #time.sleep(0.1)
                 gw.sg.set_rf_toggle(1)
                 time.sleep(0.1)
                 #gw.sg.set_mod_toggle(1) # Commented for testing purposes 8/14/2025
-                time.sleep(0.1)
+                #time.sleep(0.1)
                 #gw.sg.set_mod_function('ramp') #set modulation function from external to ramp; Commented for testing purposes 8/14/2025
 
             elif kwargs['odmr_sg'] == 'WindFreak':
@@ -745,7 +745,7 @@ class SpinMeasurements:
                 #gw.sg.set_mod_toggle(0) # Commented for testing purposes 8/14/2025
                 gw.ps.ps_reset()
                 gw.laser.off()
-                #gw.ps.gate_off() # Closing the SPCM's gate
+                gw.ps.gate_off() # Closing the SPCM's gate
 
     #ODMR_2Dsweeping
     def odmr_run_with_2d_scan(self, **kwargs):
