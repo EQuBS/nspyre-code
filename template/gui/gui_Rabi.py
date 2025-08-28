@@ -2,6 +2,12 @@
 GUI elements for Rabi
 Tian-Xing Zheng, Sept.2023
 """
+
+"""
+To be adapted and used by EQuBS Lab.
+Rolando A. Fimbres Grijalva, Aug. 20252
+"""
+
 import numpy as np
 
 from nspyre import FlexLinePlotWidget
@@ -13,7 +19,7 @@ from pyqtgraph.Qt import QtWidgets
 #import the experiment spyrelet file
 import sys
 sys.path.append('../experiments')
-import spin_measurements as sm
+from . import spin_measurements as sm
 
 class RabiWidget(ExperimentWidget):
     def __init__(self):

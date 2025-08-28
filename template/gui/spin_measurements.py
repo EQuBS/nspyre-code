@@ -55,7 +55,7 @@ class SpinMeasurements:
         runs = int(np.ceil(runs)) # integer no. of runs
         #gw.ps.laser_on()
         # execute chosen sequence on Pulse Streamer
-        #gw.ps.stream(seq, runs) # 5/28/2025 commented by Rolando
+        #gw.ps.stream(seq, runs) # 5/28/2025 commented by Rolando, 8/25/2025 commented off by Rolando
         #print("successfully streaming")
         tt_data = gw.daq.get_counter_data()[0] # get the counter data from DAQ
         print("tt_data: ", tt_data)
@@ -68,6 +68,40 @@ class SpinMeasurements:
             #gw.ps.ps.reset() # from Pulser to ps
 
         return buffer
+    
+    def read_R(self, buffer, seq, sampling_time, runs, gw):
+        try:
+            gw.daq.start_counter([1,3], sampling_time, runs, sampling_time*runs) # channel 1 is the clock, channel 3 is the data
+        except:
+            print("DAQ TASK ERROR!")
+        runs = int(np.ceil(runs)) # integer no. of runs
+        gw.ps.stream(seq, runs)
+        event_data = gw.daq.get_counter_data() # get the counter data from TimeTagger
+        buffer = obtain(event_data)
+        return buffer
+
+    def read_TX(self, buffer, seq, runs):
+        '''
+        Function that takes empty buffer as argument, reads samples to buffer and returns it.
+        '''
+        with InstrumentGateway() as gw:
+            try:
+                gw.daq.start_task()
+            except:
+                print("DAQ TASK ERROR!")
+            
+            runs = int(np.ceil(runs)) # integer no. of runs
+            #gw.ps.laser_on()
+            # execute chosen sequence on Pulse Streamer
+            gw.ps.stream(seq, runs) 
+            #import pdb; pdb.set_trace()
+            # convert data back to numpy array from rpyc.netref data type
+            buffer = obtain(gw.daq.read_samples(buffer, len(buffer), 180))  
+
+            gw.daq.stop_task()
+            gw.ps.Pulser.reset()
+
+            return buffer
 
     def digital_math(self, array, exp_type, pts = 0):
         # Reshape and calculate the count from the Raw data buffer from the digital readout counter
@@ -598,8 +632,6 @@ class SpinMeasurements:
     def odmr_run(self, **kwargs):
         '''
         Developed by Tian-Xing in Sept.2023
-
-        Slight modifications for EQuBS Lab (still based on Tian-Xing's work) by Rolando, August 2025.
         '''
         with InstrumentGateway() as gw, DataSource(kwargs['dataset']) as odmr_data:
 
@@ -746,6 +778,31 @@ class SpinMeasurements:
                 gw.ps.ps_reset()
                 gw.laser.off()
                 gw.ps.gate_off() # Closing the SPCM's gate
+
+
+    """def odmr_run_R(self, **kwargs): # by Rolando 8/27/2025
+            with InstrumentGateway() as gw, DataSource(kwargs['dataset']) as odmr_data:
+
+                # Sig. Gen. cannot allow more than 6 digits after the decimal point.
+                np.set_printoptions(precision = 6)
+                
+                # Set the freq. sweep
+                frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
+                
+                signal_sweeps = StreamingList()
+                background_sweeps = StreamingList()
+
+                # We get the laser ready to be triggered by the Pulse Streamer
+                gw.laser.cw_mode()
+                gw.laser.on()
+
+                # We set the appropriate Sig. Generator
+                if kwargs['odmr_sg'] == 'SRS':
+                    # We create the Pulse Streamer seq.
+                    if kwargs['odmr_type'] == 'CW':
+                    gw.ps.CW_ODMR()
+
+    """
 
     #ODMR_2Dsweeping
     def odmr_run_with_2d_scan(self, **kwargs):

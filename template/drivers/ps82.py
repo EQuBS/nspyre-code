@@ -12,13 +12,23 @@ class PS82():
         The following variables allow the functionality of the copied function from pulses.py
         units in [ns].
         - Rolando
+
+        *** New Channel Dict. *** Proposed 8/27/2025 Rolando
+
+        Virtual Gate: 0
+        Sync: 1 
+        Nanodrive: 2
+        SPCM gate (gate): 3
+        Laser trigger (laser): 7
+
         """
         self.channel_dict = {"clock": 0, "laser": 7, "switch": 2, "gate":3, "": 4, "": 5, "": 6, "": 1, "": None} # Change done by Rolando in PS channel dictionary.
         self.clock_time = 10
         self.sampling_time = 50000
         self.laser_lag = 130
         self.MW_buffer_time = 200
-        self.readout_time = 400 
+        self.readout_time = 400
+        self.total_time = 0 #update when a pulse sequence is streamed 
         ip="169.254.8.2"
         self.ps = PulseStreamer(ip)
         self.last_wfm = []
@@ -369,6 +379,112 @@ class PS82():
         # for i in range(runs):
         #     seqs += SinglePulsed_ODMR()
 
+        return seqs
+    
+    def Rabi(self, params, pi_xy, init_time, read_time, wait_time, read_wait, seq_gap):
+        '''
+        Rabi sequence
+        init_time: laser duration for initialize the qubit
+        read_time: laser duration for readout the qubit
+        wait_time: waiting duration after the initialization laser
+        read_wait: waiting duration before the readout laser
+        seq_gap: waiting time after each sequence is done, for reinitialization. If needed
+        '''
+        ## Run a MW pulse of varying duration, then measure the signal
+        ## and reference counts from NV.
+        # self.total_time = 0
+        longest_time = self.convert_type(round(max(params)), float)
+        self.laser_time = init_time
+        self.readout_time = read_time
+        ## we can measure the pi time on x and on y.
+        ## they should be the same, but they technically
+        ## have different offsets on our pulse streamer.
+        if pi_xy == 'x':
+            self.IQ_ON = self.IQpx
+        elif pi_xy == 'y':
+            self.IQ_ON = self.IQpy
+        else:
+            raise ValueError("pi_xy must be 'x' or 'y'!")
+
+        def SingleRabi(iq_on):
+            '''
+            CREATE SINGLE RABI SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
+            '''
+
+            iq_on = float(round(iq_on)) # convert to proper data type to avoid undesired rpyc netref data type
+
+            '''
+            DEFINE SPECIAL TIME INTERVALS FOR EXPERIMENT
+            '''
+            # padding time to equalize duration of every run (for different vsg_on durations)
+
+            pad_time = longest_time - iq_on
+
+            '''
+            DEFINE RELEVANT ON, OFF TIMES FOR DEVICES
+            '''
+            init_laser_time = self.laser_time
+            #laser_off1 = self.singlet_decay + iq_on + self.MW_buffer_time
+            #laser_off1 = wait_time + iq_on + self.MW_buffer_time
+            laser_off1 = wait_time + iq_on + self.MW_buffer_time + read_wait
+            laser_off2 = 200 + pad_time + seq_gap
+            self.total_time = init_laser_time + laser_off1 + self.readout_time + laser_off2
+
+            # mw I & Q off windows
+            #iq_off1 = self.laser_lag + self.laser_time + self.singlet_decay
+            iq_off1 = self.laser_lag + self.laser_time + wait_time
+            #iq_off2 = self.MW_buffer_time + self.readout_time + laser_off2 - self.laser_lag
+            iq_off2 = self.MW_buffer_time + read_wait + self.readout_time + laser_off2 - self.laser_lag
+
+            # DAQ trigger windows
+            clock_off1 = self.laser_lag + self.laser_time + laser_off1
+            clock_off_readout = self.readout_time - 2*self.clock_time
+            clock_off2 = laser_off2 - self.laser_lag
+                
+            '''
+            CONSTRUCT PULSE SEQUENCE
+            '''
+            # create sequence objects for MW on and off blocks
+            seq_on = self.ps.createSequence()
+            seq_off = self.ps.createSequence()
+
+            # define sequence structure for laser
+            laser_seq = [(init_laser_time, 1), (laser_off1, 0), (self.readout_time, 1), (laser_off2, 0)]
+            
+            # define sequence structure for DAQ trigger
+            daq_clock_seq = [(clock_off1, 0), (self.clock_time, 1), (clock_off_readout, 0), (self.clock_time, 1), (clock_off2, 0)]
+            
+            # define sequence structure for MW I and Q when MW = ON
+            mw_I_on_seq = [(iq_off1, self.IQ0[0]), (iq_on, self.IQ_ON[0]), (iq_off2, self.IQ0[0])]
+            mw_Q_on_seq = [(iq_off1, self.IQ0[1]), (iq_on, self.IQ_ON[1]), (iq_off2, self.IQ0[1])]
+
+            # when MW = OFF
+            mw_I_off_seq = [(iq_off1, self.IQ0[0]), (iq_on, self.IQ0[0]), (iq_off2, self.IQ0[0])]
+            mw_Q_off_seq = [(iq_off1, self.IQ0[1]), (iq_on, self.IQ0[1]), (iq_off2, self.IQ0[1])]
+            #print('\ndaq_clock_seq is:\n',daq_clock_seq)
+            # assign sequences to respective channels for seq_on
+            seq_on.setDigital(self.channel_dict["laser"], laser_seq) # laser 
+            seq_on.setDigital(self.channel_dict["clock"], daq_clock_seq) # integrator trigger
+            # seq_on.setDigital(1, switch_on_seq) # RF control switch
+            seq_on.setAnalog(0, mw_I_on_seq) # mw_I
+            seq_on.setAnalog(1, mw_Q_on_seq) # mw_Q
+            
+            # assign sequences to respective channels for seq_off
+            seq_off.setDigital(self.channel_dict["laser"], laser_seq) # laser
+            seq_off.setDigital(self.channel_dict["clock"], daq_clock_seq) # integrator trigger
+            # seq_off.setDigital(1, switch_off_seq) # RF control switch
+            seq_off.setAnalog(0, mw_I_off_seq) # mw_I
+            seq_off.setAnalog(1, mw_Q_off_seq) # mw_Q
+
+            return seq_on + seq_off
+
+        seqs = self.ps.createSequence()
+        seqs_total_time = 0
+        for mw_time in params:
+            seqs += SingleRabi(mw_time)
+            seqs_total_time += 2*self.total_time
+        print('Rabi sequence created!')
+        print('sequence time for 1 run is (ns):',seqs_total_time)
         return seqs
 
     def ps_reset(self):
