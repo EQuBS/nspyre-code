@@ -789,10 +789,10 @@ class SpinMeasurements:
                 np.set_printoptions(precision = 6)
                 
                 # Set the freq. sweep
-                frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
+                #frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
                 
                 signal_sweeps = StreamingList()
-                background_sweeps = StreamingList()
+                #background_sweeps = StreamingList()
 
                 # We get the laser ready to be triggered by the Pulse Streamer
                 gw.laser.cw_mode()
@@ -802,18 +802,22 @@ class SpinMeasurements:
                 if kwargs['odmr_sg'] == 'SRS':
                     # We create the Pulse Streamer seq.
                     if kwargs['odmr_type'] == 'CW':
-                        # Period = Sweep_time = Probe_time = 1/Mod. Sweep Rate 
-                        sweep_time = kwargs['probe_time'] * 1e9 # change unit to ns
+                        # Period = Sweep_time = Probe_time = 1/Mod. Sweep Rate
+                        # sweep_time = kwargs['probe_time'] * 1e9 # change unit to ns
                         sweep_rate = 1/kwargs['probe_time']
                         cw_odmr_seq = gw.ps.CW_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9)
                 
                 # We set parameters for our signal generator
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
-                gw.sg.set_rf_frequency(kwargs['mw_freq'])
+                gw.sg.set_rf_frequency(2.87e9)
                 gw.sg.set_mod_type(3)   # Frequency Sweep
                 gw.sg.set_sfunction(1) # Ramp
-                gw.sg.set_sdeviation(200e6)
-                gw.sg.set_srate(0.1)
+                # Sweep deviation marks the range of frequencies by deviating +/- the dev. frequency
+                # sweep_deviation = (kwargs['stop_freq'] - kwargs['start_freq'])/2
+                sweep_dev = kwargs['sweep_dev']
+                gw.sg.set_sdeviation(sweep_dev)
+                sweep_rate = kwargs['sweep_rate']
+                gw.sg.set_srate(sweep_rate)
 
                 # We assign Trigger Levels, and counting event in the Time Tagger
                 gate = 1
@@ -827,7 +831,7 @@ class SpinMeasurements:
                 gated_detector_vch = gw.daq.gated_ch(self.tagger, spcm, gate, -gate)
                 # We get the virtual channel
                 gated_detector = gated_detector_vch.get_virtual_channel()
-                cbm = gw.daq.start_cbm(click_channel=spcm, begin_channel=sync, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
+                cbm = gw.daq.start_cbm(click_channel=gated_detector, begin_channel=sync, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
                 gw.sg.set_mdo_toggle(1)
                 gw.sg.set_rf_toggle(1)
                 cbm.start()
@@ -842,14 +846,26 @@ class SpinMeasurements:
                     ready = gw.daq.cbm_ready()
                     counts = gw.daq.count_BM()
 
+                # We get the time array for the CBM measurement
+                #time = cbm.getIndex()
+
+                # Frequency array
+                freq = np.linspace(2.87e9 - sweep_deviation, 2.87e9 + sweep_deviation, kwargs['num_points'])
+
                 # We turn OFF the mw signal (modulation and amplitude)
                 gw.sg.set_rf_toggle(0)
                 gw.sg.set_mod_toggle(0)
 
                 # Data processing part missing
-
+                signal_sweeps = counts
                 # Data push missing
-
+                odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
+                                    'title': 'Optically Detected Magnetic Resonance',
+                                    'xlabel': 'Frequency (GHz)',
+                                    'ylabel': 'Counts',
+                                    'datasets': {'signal' : signal_sweeps,
+                                                'background': background_sweeps}
+                        })
 
     
 

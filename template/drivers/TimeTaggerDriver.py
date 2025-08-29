@@ -123,7 +123,7 @@ class tt20:
 
     """ def unused(self):
         return tt """
-    #def get_Index(self)
+    #def get_cbm_Index(self):
 
     def cbm_ready(self):
         return self.cbm.ready()

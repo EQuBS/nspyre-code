@@ -102,6 +102,24 @@ class ODMR_Widget(ExperimentWidget):
                     bounds = (5e-9, None),
                 ),
             },
+            'sweep_rate':{
+                'display_text': 'Sweep Rate: ',
+                'widget': SpinBox(
+                    value = 1,
+                    suffix = 'Hz',
+                    siPrefix = True,
+                    bounds = (1e-6, 120),
+                ),
+            },
+            'sweep_dev': {
+                'display_text': 'Sweep Deviation: ',
+                'widget': SpinBox(
+                    value = 1e6,
+                    suffix = 'Hz',
+                    siPrefix = True,
+                    bounds = (1e-6, 120),
+                ),
+            },
             'read_time': {
                 'display_text': 'Readout Time: ',
                 'widget': SpinBox(
