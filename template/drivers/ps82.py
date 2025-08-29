@@ -14,14 +14,16 @@ class PS82():
         - Rolando
 
         *** New Channel Dict. *** Proposed 8/27/2025 Rolando
+        To be called channel_r 
 
-        Virtual Gate: 0
-        Sync: 1 
-        Nanodrive: 2
-        SPCM gate (gate): 3
+        Virtual Gate (vrt_gate): 0
+        Sync (sync): 1
+        Nanodrive (nano): 2
+        SPCM gate (spcm_gate): 3
         Laser trigger (laser): 7
 
         """
+        self.channel_r = {"vrt_gate": 0, "sync": 1, "nano": 2, "spcm_gate": 3, "laser": 7}
         self.channel_dict = {"clock": 0, "laser": 7, "switch": 2, "gate":3, "": 4, "": 5, "": 6, "": 1, "": None} # Change done by Rolando in PS channel dictionary.
         self.clock_time = 10
         self.sampling_time = 50000
@@ -381,6 +383,29 @@ class PS82():
 
         return seqs
     
+    """
+    def CW_ODMR_R(self, iterations, probe_time):
+    
+        seq = self.ps.createSequence()
+        
+        laser_patt = [(probe_time, 1)]
+        #mw_I_patt = [(probe_time, 1)]
+        #mw_Q_patt = [(probe_time, 1)]
+        sync_patt = [(10, 1), (probe_time-10, 0)]
+        gate_patt = [(probe_time, 1)]
+
+        seq.setDigital(self.channel_r['laser'], laser_patt*iterations)
+        seq.setDigital(self.channel_r['sync'], sync_patt*iterations)
+        seq.setDigital(self.channel_r['vrt_gate'], gate_patt*iterations)
+
+        #seq.setAnalog(0, mw_I_patt)
+        #seq.setAnalog(1, mw_Q_patt)
+
+        return seq
+
+    """
+
+
     def Rabi(self, params, pi_xy, init_time, read_time, wait_time, read_wait, seq_gap):
         '''
         Rabi sequence

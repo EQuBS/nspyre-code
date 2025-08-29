@@ -13,7 +13,9 @@ from .gui_dlnsec import DLnsecWidget
 
 from PyQt5.QtCore import pyqtSignal
 
-from rpyc.utils.classic import obtain 
+from rpyc.utils.classic import obtain
+
+from TimeTagger import CHANNEL_UNUSED
 
 # from drivers.pulses import Pulses
 
@@ -800,7 +802,54 @@ class SpinMeasurements:
                 if kwargs['odmr_sg'] == 'SRS':
                     # We create the Pulse Streamer seq.
                     if kwargs['odmr_type'] == 'CW':
-                    gw.ps.CW_ODMR()
+                        # Period = Sweep_time = Probe_time = 1/Mod. Sweep Rate 
+                        sweep_time = kwargs['probe_time'] * 1e9 # change unit to ns
+                        sweep_rate = 1/kwargs['probe_time']
+                        cw_odmr_seq = gw.ps.CW_ODMR_R(iterations, kwargs['probe_time']*1e9)
+                
+                # We set parameters for our signal generator
+                gw.sg.set_rf_amplitude(kwargs['mw_power'])
+                gw.sg.set_rf_frequency(kwargs['mw_freq'])
+                gw.sg.set_mod_type(3)   # Frequency Sweep
+                gw.sg.set_sfunction(1) # Ramp
+                gw.sg.set_sdeviation(200e6)
+                gw.sg.set_srate(0.1)
+
+                # We assign Trigger Levels, and counting event in the Time Tagger
+                gate = 1
+                sync = 2
+                spcm = 3
+
+                #gw.daq.set_trigger_level(spcm, 1.3)
+                gw.daq.set_trigger_level(spcm, 1.3)
+                gw.daq.set_trigger_level(spcm, 1.1)
+
+                gated_detector_vch = gw.daq.gated_ch(self.tagger, spcm, gate, -gate)
+                # We get the virtual channel
+                gated_detector = gated_detector_vch.get_virtual_channel()
+                cbm = gw.daq.start_cbm(click_channel=spcm, begin_channel=sync, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
+                gw.sg.set_mdo_toggle(1)
+                gw.sg.set_rf_toggle(1)
+                cbm.start()
+                gw.daq.sync() # or self.tagger.sync()
+
+
+                ready = False
+
+                # Data collection
+                while ready is False:
+                    time.sleep(0.2)
+                    ready = gw.daq.cbm_ready()
+                    counts = gw.daq.count_BM()
+
+                # We turn OFF the mw signal (modulation and amplitude)
+                gw.sg.set_rf_toggle(0)
+                gw.sg.set_mod_toggle(0)
+
+                # Data processing part missing
+
+                # Data push missing
+
 
     """
 

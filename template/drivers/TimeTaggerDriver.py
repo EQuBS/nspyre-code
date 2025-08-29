@@ -125,6 +125,9 @@ class tt20:
         return tt """
     #def get_Index(self)
 
+    def cbm_ready(self):
+        return self.cbm.ready()
+
     # Create "SynchronizedMeasurements" for tagger, and get its tagger proxy.
     def synchro(self):
         """
@@ -179,3 +182,8 @@ class tt20:
             tagger = self.tagger
         self.correlation = tt.Correlation(tagger, channel_1, channel_2, binwidth, n_bins)
         #self.correlation.start()
+
+    def gated_ch(self, input_ch, gate_start, gate_stop):
+        if tagger is None:
+            tagger = self.tagger
+        self.gated_channel = tt.GatedChannel(tagger, input_ch, gate_start, gate_stop)
