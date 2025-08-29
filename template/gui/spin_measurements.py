@@ -782,7 +782,7 @@ class SpinMeasurements:
                 gw.ps.gate_off() # Closing the SPCM's gate
 
 
-    """def odmr_run_R(self, **kwargs): # by Rolando 8/27/2025
+    def odmr_run_R(self, **kwargs): # by Rolando 8/27/2025
             with InstrumentGateway() as gw, DataSource(kwargs['dataset']) as odmr_data:
 
                 # Sig. Gen. cannot allow more than 6 digits after the decimal point.
@@ -805,7 +805,7 @@ class SpinMeasurements:
                         # Period = Sweep_time = Probe_time = 1/Mod. Sweep Rate 
                         sweep_time = kwargs['probe_time'] * 1e9 # change unit to ns
                         sweep_rate = 1/kwargs['probe_time']
-                        cw_odmr_seq = gw.ps.CW_ODMR_R(iterations, kwargs['probe_time']*1e9)
+                        cw_odmr_seq = gw.ps.CW_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9)
                 
                 # We set parameters for our signal generator
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
@@ -851,7 +851,7 @@ class SpinMeasurements:
                 # Data push missing
 
 
-    """
+    
 
     #ODMR_2Dsweeping
     def odmr_run_with_2d_scan(self, **kwargs):

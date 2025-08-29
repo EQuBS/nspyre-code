@@ -383,7 +383,7 @@ class PS82():
 
         return seqs
     
-    """
+    
     def CW_ODMR_R(self, iterations, probe_time):
     
         seq = self.ps.createSequence()
@@ -403,7 +403,7 @@ class PS82():
 
         return seq
 
-    """
+    
 
 
     def Rabi(self, params, pi_xy, init_time, read_time, wait_time, read_wait, seq_gap):
