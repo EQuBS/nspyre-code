@@ -114,10 +114,10 @@ class ODMR_Widget(ExperimentWidget):
             'sweep_dev': {
                 'display_text': 'Sweep Deviation: ',
                 'widget': SpinBox(
-                    value = 1e6,
+                    value = 100e6,
                     suffix = 'Hz',
                     siPrefix = True,
-                    bounds = (1e-6, 120),
+                    bounds = (1, 575e6),
                 ),
             },
             'read_time': {

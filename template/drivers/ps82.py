@@ -386,7 +386,8 @@ class PS82():
     
     def CW_ODMR_R(self, iterations, probe_time):
     
-        seq = self.ps.createSequence()
+        seq_on = self.ps.createSequence()
+        #seq_off = self.ps.createSequence()
         
         laser_patt = [(probe_time, 1)]
         #mw_I_patt = [(probe_time, 1)]
@@ -394,15 +395,33 @@ class PS82():
         sync_patt = [(10, 1), (probe_time-10, 0)]
         gate_patt = [(probe_time, 1)]
 
-        seq.setDigital(self.channel_r['laser'], laser_patt*iterations)
-        seq.setDigital(self.channel_r['sync'], sync_patt*iterations)
-        seq.setDigital(self.channel_r['vrt_gate'], gate_patt*iterations)
+        seq_on.setDigital(self.channel_r['laser'], laser_patt*iterations)
+        seq_on.setDigital(self.channel_r['sync'], sync_patt*iterations)
+        seq_on.setDigital(self.channel_r['vrt_gate'], gate_patt*iterations)
+
+        
 
         #seq.setAnalog(0, mw_I_patt)
         #seq.setAnalog(1, mw_Q_patt)
 
-        return seq
+        return seq_on
 
+    def Pulsed_ODMR_R(self, iterations, probe_time, read_time):
+           init_laser_time = self.laser_time
+           laser_patt = [(init_laser_time, 1), (4000, 0), (init_laser_time, 1), (4000, 0)]
+           sync_patt = [(10, 1), (8000-10, 0)]
+           gate_patt = [(4000, 0), (read_time, 1), (4000-read_time, 0)]
+           mw_I_patt = [(2000, 0)]
+           mw_Q_patt = [(probe_time, 1)]
+
+           pul_seq = self.ps.createSequence()
+           pul_seq.setDigital(self.channel_r['laser'], laser_patt*iterations)
+           pul_seq.setDigital(self.channel_r['sync'], sync_patt*iterations)
+           pul_seq.setDigital(self.channel_r['vrt_gate'], gate_patt*iterations)
+           pul_seq.setAnalog(0, mw_I_patt*iterations)
+           pul_seq.setAnalog(1, mw_Q_patt*iterations)
+
+           return pul_seq
     
 
 

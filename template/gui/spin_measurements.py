@@ -783,91 +783,149 @@ class SpinMeasurements:
 
 
     def odmr_run_R(self, **kwargs): # by Rolando 8/27/2025
-            with InstrumentGateway() as gw, DataSource(kwargs['dataset']) as odmr_data:
+        with InstrumentGateway() as gw, DataSource(kwargs['dataset']) as odmr_data:
 
-                # Sig. Gen. cannot allow more than 6 digits after the decimal point.
-                np.set_printoptions(precision = 6)
-                
-                # Set the freq. sweep
-                #frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
-                
-                signal_sweeps = StreamingList()
-                #background_sweeps = StreamingList()
+            # Sig. Gen. cannot allow more than 6 digits after the decimal point.
+            np.set_printoptions(precision = 6)
+            
+            # Set the freq. sweep
+            #frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
+            
+            signal_sweeps = StreamingList()
+            background_sweeps = StreamingList()
 
-                # We get the laser ready to be triggered by the Pulse Streamer
-                gw.laser.cw_mode()
-                gw.laser.on()
+            # We get the laser ready to be triggered by the Pulse Streamer
+            gw.laser.cw_mode()
+            gw.laser.on()
 
-                # We set the appropriate Sig. Generator
-                if kwargs['odmr_sg'] == 'SRS':
-                    # We create the Pulse Streamer seq.
-                    if kwargs['odmr_type'] == 'CW':
-                        # Period = Sweep_time = Probe_time = 1/Mod. Sweep Rate
-                        # sweep_time = kwargs['probe_time'] * 1e9 # change unit to ns
-                        sweep_rate = 1/kwargs['probe_time']
-                        cw_odmr_seq = gw.ps.CW_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9)
-                
+            # We set the appropriate Sig. Generator
+            if kwargs['odmr_sg'] == 'SRS':
+                # We create the Pulse Streamer seq.
+                if kwargs['odmr_type'] == 'CW':
+                    # Period = Sweep_time = Probe_time = 1/Mod. Sweep Rate
+                    # sweep_time = kwargs['probe_time'] * 1e9 # change unit to ns
+                    sweep_rate = 1/kwargs['probe_time']
+                    gw.sg.set_mod_type(3)   # Frequency Sweep
+                    gw.sg.set_sfunction(1)  # Ramp
+                    # Sweep deviation marks the range of frequencies by deviating +/- the dev. frequency
+                    # sweep_deviation = (kwargs['stop_freq'] - kwargs['start_freq'])/2
+                    sweep_dev = kwargs['sweep_dev']
+                    gw.sg.set_sdeviation(sweep_dev)
+                    sweep_rate = kwargs['sweep_rate']
+                    gw.sg.set_srate(sweep_rate)
+                    cw_odmr_seq = gw.ps.CW_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9)
+                elif kwargs['odmr_type']=='Pulsed':
+                    sweep_rate = 1/kwargs['probe_time']
+                    pul_odmr_seq = gw.ps.Pulsed_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9, kwargs['read_time']*1e9)
+                else:
+                    raise ValueError("Invalid ODMR type")
+
                 # We set parameters for our signal generator
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
                 gw.sg.set_rf_frequency(2.87e9)
-                gw.sg.set_mod_type(3)   # Frequency Sweep
-                gw.sg.set_sfunction(1) # Ramp
-                # Sweep deviation marks the range of frequencies by deviating +/- the dev. frequency
-                # sweep_deviation = (kwargs['stop_freq'] - kwargs['start_freq'])/2
-                sweep_dev = kwargs['sweep_dev']
-                gw.sg.set_sdeviation(sweep_dev)
-                sweep_rate = kwargs['sweep_rate']
-                gw.sg.set_srate(sweep_rate)
+            
+            
 
-                # We assign Trigger Levels, and counting event in the Time Tagger
-                gate = 1
-                sync = 2
-                spcm = 3
+            # We assign Trigger Levels, and counting event in the Time Tagger
+            gate = 1
+            sync = 2
+            spcm = 3
 
-                #gw.daq.set_trigger_level(spcm, 1.3)
-                gw.daq.set_trigger_level(spcm, 1.3)
-                gw.daq.set_trigger_level(spcm, 1.1)
+            #gw.daq.set_trigger_level(spcm, 1.3)
+            gw.daq.set_trigger_level(spcm, 1.3)
+            gw.daq.set_trigger_level(spcm, 1.1)
 
-                gated_detector_vch = gw.daq.gated_ch(self.tagger, spcm, gate, -gate)
-                # We get the virtual channel
-                gated_detector = gated_detector_vch.get_virtual_channel()
-                cbm = gw.daq.start_cbm(click_channel=gated_detector, begin_channel=sync, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
-                gw.sg.set_mdo_toggle(1)
-                gw.sg.set_rf_toggle(1)
-                cbm.start()
-                gw.daq.sync() # or self.tagger.sync()
+            gated_detector_vch = gw.daq.gated_ch(self.tagger, spcm, gate, -gate)
+            # We get the virtual channel
+            gated_detector = gated_detector_vch.get_virtual_channel()
+            cbm = gw.daq.start_cbm(click_channel=gated_detector, begin_channel=sync, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
+            gw.sg.set_mdo_toggle(1)
+            gw.sg.set_rf_toggle(1)
+
+            ready = False
+
+            """ # Data collection
+            while ready is False:
+                time.sleep(0.2)
+                ready = gw.daq.cbm_ready()
+                counts = gw.daq.count_BM() """
+
+            # We get the time array for the CBM measurement
+            #time = cbm.getIndex()
+
+            # Frequency array
+            freq = np.linspace(2.87e9 - sweep_dev, 2.87e9 + sweep_dev, kwargs['num_points'])
+
+            with tqdm(total = kwargs['iteration']) as pbar:
+                for iter in range(kwargs['iterations']):
+                    sig_counts = np.empty(kwargs['num_points'])
+                    sig_counts[:] = np.nan
+                    signal_sweeps.append(np.stack([freq/1e9, sig_counts]))
+                    bg_counts = np.empty(kwargs['num_points'])
+                    bg_counts[:] = np.nan
+                    background_sweeps.append(np.stack([freq/1e9, bg_counts]))
+         
+                    for f, freq in enumerate(freq):
+                        if kwargs['odmr_sg'] == 'SRS':
+                            gw.sg.set_frequency(freq)
+                        else:
+                            raise ValueError("Invalid ODMR signal generator")
+                        if kwargs['odmr_type'] == 'CW':
+
+                            # We stream the corresponding sequence
+                            gw.ps.stream(cw_odmr_seq, 1) 
+                            cbm.start()
+                            gw.daq.sync() # or self.tagger.sync()
+                            # Data collection
+                            while ready is False:
+                                time.sleep(0.2)
+                                ready = gw.daq.cbm_ready()
+                                counts = obtain(gw.daq.count_BM())
+                                sig, bg = self.digital_math(counts, 'ODMR')
+                                # Data processing (normalization, etc.) 
+                        elif kwargs['odmr_type'] == 'Pulsed':
+                            gw.ps.stream(pul_odmr_seq, kwargs['runs'])
+                            cbm.start()
+                            gw.daq.sync()
+                            # Data collection
+                            while ready is False:
+                                time.sleep(0.2)
+                                ready = gw.daq.cbm_ready()
+                                counts = obtain(gw.daq.count_BM())
+                                sig, bg = self.digital_math(counts, 'Pulsed ODMR')
+                                # Data processing (normalization, etc.)
+                        # Record of photon counts
+                        signal_sweeps[-1][1][f] = sig
+                        background_sweeps[-1][1][f] = bg  
+                        # Notify the streamlist, and update it
+                        signal_sweeps.updated_item(-1)
+                        background_sweeps.updated_item(-1)
 
 
-                ready = False
+                        # Data push 
+                        odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
+                                            'title': 'Optically Detected Magnetic Resonance',
+                                            'xlabel': 'Frequency (GHz)',
+                                            'ylabel': 'Counts',
+                                            'datasets': {'signal' : signal_sweeps,
+                                                        'background': background_sweeps}
+                                })
 
-                # Data collection
-                while ready is False:
-                    time.sleep(0.2)
-                    ready = gw.daq.cbm_ready()
-                    counts = gw.daq.count_BM()
 
-                # We get the time array for the CBM measurement
-                #time = cbm.getIndex()
-
-                # Frequency array
-                freq = np.linspace(2.87e9 - sweep_deviation, 2.87e9 + sweep_deviation, kwargs['num_points'])
+                        #
+                        if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                            gw.daq.free_time_tagger()
+                            gw.sg.set_rf_toggle(0)
+                            gw.sg.set_mod_toggle(0)
+                            gw.ps.ps_reset()
+                            gw.laser.off()
+                            print('the GUI has asked us nicely to exit')
+                            return
+                    pbar.update(1)
 
                 # We turn OFF the mw signal (modulation and amplitude)
                 gw.sg.set_rf_toggle(0)
                 gw.sg.set_mod_toggle(0)
-
-                # Data processing part missing
-                signal_sweeps = counts
-                # Data push missing
-                odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
-                                    'title': 'Optically Detected Magnetic Resonance',
-                                    'xlabel': 'Frequency (GHz)',
-                                    'ylabel': 'Counts',
-                                    'datasets': {'signal' : signal_sweeps,
-                                                'background': background_sweeps}
-                        })
-
-    
 
     #ODMR_2Dsweeping
     def odmr_run_with_2d_scan(self, **kwargs):
