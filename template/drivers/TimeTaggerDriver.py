@@ -183,7 +183,11 @@ class tt20:
         self.correlation = tt.Correlation(tagger, channel_1, channel_2, binwidth, n_bins)
         #self.correlation.start()
 
-    def gated_ch(self, input_ch, gate_start, gate_stop):
+    def gated_ch(self, input_ch, gate_start, gate_stop, tagger=None):
         if tagger is None:
             tagger = self.tagger
         self.gated_channel = tt.GatedChannel(tagger, input_ch, gate_start, gate_stop)
+        return self.gated_channel
+
+    def get_channel(self):
+        return self.gated_channel.getChannel()

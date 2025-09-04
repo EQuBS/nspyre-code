@@ -182,7 +182,7 @@ class ODMR_Widget(ExperimentWidget):
         super().__init__(params_config, 
                         sm,  # No specific measurements class
                         'SpinMeasurements',  # No specific class name
-                        'odmr_run',  # No specific run method
+                        'odmr_run_R',  # No specific run method
                         title='ODMR')
 """
 

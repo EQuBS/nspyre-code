@@ -788,6 +788,8 @@ class SpinMeasurements:
             # Sig. Gen. cannot allow more than 6 digits after the decimal point.
             np.set_printoptions(precision = 6)
             
+            sync = gw.tagger.synchro()
+
             # Set the freq. sweep
             #frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
             
@@ -796,6 +798,7 @@ class SpinMeasurements:
 
             # We get the laser ready to be triggered by the Pulse Streamer
             gw.laser.cw_mode()
+            gw.ps.gate_on()
             gw.laser.on()
 
             # We set the appropriate Sig. Generator
@@ -822,7 +825,7 @@ class SpinMeasurements:
 
                 # We set parameters for our signal generator
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
-                gw.sg.set_rf_frequency(2.87e9)
+                gw.sg.set_frequency(2.87e9)
             
             
 
@@ -835,11 +838,11 @@ class SpinMeasurements:
             gw.daq.set_trigger_level(spcm, 1.3)
             gw.daq.set_trigger_level(spcm, 1.1)
 
-            gated_detector_vch = gw.daq.gated_ch(self.tagger, spcm, gate, -gate)
+            gated_detector_vch = gw.daq.gated_ch(spcm, gate, -gate)
             # We get the virtual channel
-            gated_detector = gated_detector_vch.get_virtual_channel()
-            cbm = gw.daq.start_cbm(click_channel=gated_detector, begin_channel=sync, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
-            gw.sg.set_mdo_toggle(1)
+            gated_detector = gated_detector_vch.getChannel()
+            cbm = gw.daq.start_cbm(tagger=sync,click_channel=gated_detector, begin_channel=sync, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
+            gw.sg.set_mod_toggle(1)
             gw.sg.set_rf_toggle(1)
 
             ready = False
@@ -856,7 +859,7 @@ class SpinMeasurements:
             # Frequency array
             freq = np.linspace(2.87e9 - sweep_dev, 2.87e9 + sweep_dev, kwargs['num_points'])
 
-            with tqdm(total = kwargs['iteration']) as pbar:
+            with tqdm(total = kwargs['iterations']) as pbar:
                 for iter in range(kwargs['iterations']):
                     sig_counts = np.empty(kwargs['num_points'])
                     sig_counts[:] = np.nan
@@ -874,7 +877,7 @@ class SpinMeasurements:
 
                             # We stream the corresponding sequence
                             gw.ps.stream(cw_odmr_seq, 1) 
-                            cbm.start()
+                            sync.sync_sFor() #cbm.start()
                             gw.daq.sync() # or self.tagger.sync()
                             # Data collection
                             while ready is False:
@@ -926,6 +929,10 @@ class SpinMeasurements:
                 # We turn OFF the mw signal (modulation and amplitude)
                 gw.sg.set_rf_toggle(0)
                 gw.sg.set_mod_toggle(0)
+                gw.ps.gate_off()
+                gw.ps.ps_reset()
+                gw.daq.free_time_tagger()
+
 
     #ODMR_2Dsweeping
     def odmr_run_with_2d_scan(self, **kwargs):

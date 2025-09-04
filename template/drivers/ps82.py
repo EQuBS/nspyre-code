@@ -388,16 +388,22 @@ class PS82():
     
         seq_on = self.ps.createSequence()
         #seq_off = self.ps.createSequence()
+
+        iq_on = probe_time
+        iq_off = probe_time
         
         laser_patt = [(probe_time, 1)]
-        #mw_I_patt = [(probe_time, 1)]
-        #mw_Q_patt = [(probe_time, 1)]
+        mw_I_patt = [(iq_on, self.IQpx[0]), (iq_off, self.IQ0[0])]
+        mw_Q_patt = [(iq_on, self.IQpx[1]), (iq_off, self.IQ0[1])]
         sync_patt = [(10, 1), (probe_time-10, 0)]
         gate_patt = [(probe_time, 1)]
 
         seq_on.setDigital(self.channel_r['laser'], laser_patt*iterations)
         seq_on.setDigital(self.channel_r['sync'], sync_patt*iterations)
         seq_on.setDigital(self.channel_r['vrt_gate'], gate_patt*iterations)
+        seq_on.setAnalog(0, mw_I_patt*iterations)
+        seq_on.setAnalog(1, mw_Q_patt*iterations)
+
 
         
 
@@ -406,13 +412,24 @@ class PS82():
 
         return seq_on
 
-    def Pulsed_ODMR_R(self, iterations, probe_time, read_time):
+    def Pulsed_ODMR_R(self, pi_xy, iterations, probe_time, read_time):
+           # Seq. objects for on and off
+           """ seq_on = self.ps.createSequence()
+           seq_off = self.ps.createSequence() """
+
+           if pi_xy == 'x':
+               self.IQ_ON = self.IQpx
+           elif pi_xy == 'y':
+               self.IQ_ON = self.IQpy
+           else:
+               raise ValueError("pi_xy must be 'x' or 'y'!")
+
            init_laser_time = self.laser_time
            laser_patt = [(init_laser_time, 1), (4000, 0), (init_laser_time, 1), (4000, 0)]
            sync_patt = [(10, 1), (8000-10, 0)]
-           gate_patt = [(4000, 0), (read_time, 1), (4000-read_time, 0)]
-           mw_I_patt = [(2000, 0)]
-           mw_Q_patt = [(probe_time, 1)]
+           gate_patt = [(read_time, 1), (4000-read_time, 0) (read_time, 1), (4000-read_time, 0)]
+           mw_I_patt = [(init_laser_time, 0), (probe_time, self.IQ_ON[0]), (4000 - init_laser_time - probe_time, 0)]
+           mw_Q_patt = [(init_laser_time, 0), (probe_time, self.IQ_ON[1]), (4000 - init_laser_time - probe_time, 0)]
 
            pul_seq = self.ps.createSequence()
            pul_seq.setDigital(self.channel_r['laser'], laser_patt*iterations)
