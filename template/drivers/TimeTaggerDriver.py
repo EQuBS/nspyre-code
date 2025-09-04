@@ -16,6 +16,9 @@ class tt20:
     def set_trigger_level(self, channel, voltage):
         self.tagger.setTriggerLevel(channel, voltage)
 
+    def sync(self):
+        self.tagger.sync()
+
     #initalizes counter measurement
     # - channels: list of channels to measure
     # - binwidth: width of each bin in ps
@@ -102,6 +105,9 @@ class tt20:
         self.cbm = tt.CountBetweenMarkers(tagger, click_channel, begin_channel, end_channel, n_values)
         #self.cbm.startFor(s_For)
 
+    def CBM_start(self):
+        self.cbm.start()
+
     #Counts between marked events, introd. 6/27/2025 by Rolando
     def count_BM(self):
         """
@@ -115,7 +121,7 @@ class tt20:
         Returns: The data from CountBetweenMarkers after measurement.
         """
         try:
-            self.cbm.waitUntilFinished()
+            #self.cbm.waitUntilFinished()
             data = self.cbm.getData()
             return data
         except AttributeError:

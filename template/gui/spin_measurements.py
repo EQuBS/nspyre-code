@@ -788,10 +788,10 @@ class SpinMeasurements:
             # Sig. Gen. cannot allow more than 6 digits after the decimal point.
             np.set_printoptions(precision = 6)
             
-            sync = gw.tagger.synchro()
+            #sync_tag = gw.tagger.synchro()
 
             # Set the freq. sweep
-            #frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
+            frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
             
             signal_sweeps = StreamingList()
             background_sweeps = StreamingList()
@@ -825,24 +825,24 @@ class SpinMeasurements:
 
                 # We set parameters for our signal generator
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
-                gw.sg.set_frequency(2.87e9)
+                
             
             
 
             # We assign Trigger Levels, and counting event in the Time Tagger
-            gate = 1
-            sync = 2
-            spcm = 3
+            gate_ch = 1
+            sync_ch = 2
+            spcm_ch = 3
 
             #gw.daq.set_trigger_level(spcm, 1.3)
-            gw.daq.set_trigger_level(spcm, 1.3)
-            gw.daq.set_trigger_level(spcm, 1.1)
+            gw.daq.set_trigger_level(spcm_ch, 1.3)
+            gw.daq.set_trigger_level(spcm_ch, 1.1)
 
-            gated_detector_vch = gw.daq.gated_ch(spcm, gate, -gate)
+            gated_detector_vch = gw.daq.gated_ch(spcm_ch, gate_ch, -gate_ch)
             # We get the virtual channel
             gated_detector = gated_detector_vch.getChannel()
-            cbm = gw.daq.start_cbm(tagger=sync,click_channel=gated_detector, begin_channel=sync, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
-            gw.sg.set_mod_toggle(1)
+            cbm = gw.daq.start_cbm(click_channel=gated_detector, begin_channel=sync_ch, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
+            #gw.sg.set_mod_toggle(1)
             gw.sg.set_rf_toggle(1)
 
             ready = False
@@ -857,18 +857,18 @@ class SpinMeasurements:
             #time = cbm.getIndex()
 
             # Frequency array
-            freq = np.linspace(2.87e9 - sweep_dev, 2.87e9 + sweep_dev, kwargs['num_points'])
+            #freq = np.linspace(2.87e9 - sweep_dev, 2.87e9 + sweep_dev, kwargs['num_points'])
 
             with tqdm(total = kwargs['iterations']) as pbar:
                 for iter in range(kwargs['iterations']):
                     sig_counts = np.empty(kwargs['num_points'])
                     sig_counts[:] = np.nan
-                    signal_sweeps.append(np.stack([freq/1e9, sig_counts]))
+                    signal_sweeps.append(np.stack([frequencies/1e9, sig_counts]))
                     bg_counts = np.empty(kwargs['num_points'])
                     bg_counts[:] = np.nan
-                    background_sweeps.append(np.stack([freq/1e9, bg_counts]))
+                    background_sweeps.append(np.stack([frequencies/1e9, bg_counts]))
          
-                    for f, freq in enumerate(freq):
+                    for f, freq in enumerate(frequencies):
                         if kwargs['odmr_sg'] == 'SRS':
                             gw.sg.set_frequency(freq)
                         else:
@@ -876,9 +876,10 @@ class SpinMeasurements:
                         if kwargs['odmr_type'] == 'CW':
 
                             # We stream the corresponding sequence
-                            gw.ps.stream(cw_odmr_seq, 1) 
-                            sync.sync_sFor() #cbm.start()
+                            gw.daq.CBM_start() #cbm.start()
                             gw.daq.sync() # or self.tagger.sync()
+                            gw.ps.stream(cw_odmr_seq, 1) 
+                    
                             # Data collection
                             while ready is False:
                                 time.sleep(0.2)
@@ -887,9 +888,10 @@ class SpinMeasurements:
                                 sig, bg = self.digital_math(counts, 'ODMR')
                                 # Data processing (normalization, etc.) 
                         elif kwargs['odmr_type'] == 'Pulsed':
-                            gw.ps.stream(pul_odmr_seq, kwargs['runs'])
-                            cbm.start()
+                            gw.daq.CBM_start()
                             gw.daq.sync()
+                            gw.ps.stream(pul_odmr_seq, kwargs['runs'])
+                            
                             # Data collection
                             while ready is False:
                                 time.sleep(0.2)
@@ -929,6 +931,7 @@ class SpinMeasurements:
                 # We turn OFF the mw signal (modulation and amplitude)
                 gw.sg.set_rf_toggle(0)
                 gw.sg.set_mod_toggle(0)
+                gw.laser.off()
                 gw.ps.gate_off()
                 gw.ps.ps_reset()
                 gw.daq.free_time_tagger()
