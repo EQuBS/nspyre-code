@@ -189,11 +189,17 @@ class PS82():
     def gate_on(self):
         # Gate AND Laser ON
         return self.ps.constant(OutputState([self.channel_dict["gate"], self.channel_dict["laser"]], 0.0, 0.0))
+    
+    def just_gate_on(self):
+        return self.ps.constant(OutputState([self.channel_dict["gate"]], 0.0, 0.0))
 
     def gate_off(self):
         # Gate AND Laser OFF
         return self.ps.constant(OutputState([], 0.0, 0.0))
-    
+
+    def just_gate_off(self):
+        return self.ps.constant(OutputState([self.channel_dict["gate"]], 0.0, 0.0))
+
     def gate_on_cw_odmr(self):
         # Gate on for the ODMR (CW) experiment
         return self.ps.constant(OutputState([self.channel_dict["gate"]], 0.0, 0.0))
@@ -384,27 +390,23 @@ class PS82():
         return seqs
     
     
-    def CW_ODMR_R(self, iterations, probe_time):
+    def CW_ODMR_R(self, runs, probe_time, read_time):
     
         seq_on = self.ps.createSequence()
         #seq_off = self.ps.createSequence()
-
-        iq_on = probe_time
-        iq_off = probe_time
         
-        laser_patt = [(probe_time, 1)]
-        mw_I_patt = [(iq_on, self.IQpx[0]), (iq_off, self.IQ0[0])]
-        mw_Q_patt = [(iq_on, self.IQpx[1]), (iq_off, self.IQ0[1])]
+        laser_patt = [((probe_time)*runs + self.clock_time, 1)]
+        gate_patt  = [(read_time, 1), (probe_time-read_time, 0), (read_time, 1), (probe_time-read_time, 0)]*runs
+        mw_I_patt = [(probe_time, self.IQpx[0]), (probe_time, self.IQ0[0])]*runs
+        mw_Q_patt = [(probe_time, self.IQpx[1]), (probe_time, self.IQ0[1])]*runs
         sync_patt = [(10, 1), (probe_time-10, 0)]
-        gate_patt = [(probe_time, 1)]
+        #gate_patt = [(probe_time, 1)]
 
-        seq_on.setDigital(self.channel_r['laser'], laser_patt*iterations)
-        seq_on.setDigital(self.channel_r['sync'], sync_patt*iterations)
-        seq_on.setDigital(self.channel_r['vrt_gate'], gate_patt*iterations)
-        seq_on.setAnalog(0, mw_I_patt*iterations)
-        seq_on.setAnalog(1, mw_Q_patt*iterations)
-
-
+        seq_on.setDigital(self.channel_r['laser'], laser_patt)
+        seq_on.setDigital(self.channel_r['sync'], sync_patt)
+        seq_on.setDigital(self.channel_r['vrt_gate'], gate_patt)
+        seq_on.setAnalog(0, mw_I_patt)
+        seq_on.setAnalog(1, mw_Q_patt)
         
 
         #seq.setAnalog(0, mw_I_patt)

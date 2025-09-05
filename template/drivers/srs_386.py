@@ -178,6 +178,12 @@ class SG386:
 
     def set_mod_function(self, value):
         self.device.write(f"MFNC {value}")
+
+    def get_qmod_function(self):
+        return int(self.device.query('QFNC?'))
+
+    def set_qmod_function(self, value):
+        self.device.write(f"QFNC {value}")
     
     # units = "Hz", limits = (0.1, 100.e3))
     def get_mod_rate(self):

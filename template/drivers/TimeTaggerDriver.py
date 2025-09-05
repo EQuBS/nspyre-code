@@ -108,6 +108,10 @@ class tt20:
     def CBM_start(self):
         self.cbm.start()
 
+    def CBM_sFor(self, duration):
+        """startFor() function for CountBetweenMarkers event."""
+        self.cbm.startFor(duration)
+
     #Counts between marked events, introd. 6/27/2025 by Rolando
     def count_BM(self):
         """

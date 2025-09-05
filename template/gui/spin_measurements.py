@@ -797,8 +797,8 @@ class SpinMeasurements:
             background_sweeps = StreamingList()
 
             # We get the laser ready to be triggered by the Pulse Streamer
-            gw.laser.cw_mode()
             gw.ps.gate_on()
+            gw.laser.cw_mode()
             gw.laser.on()
 
             # We set the appropriate Sig. Generator
@@ -807,16 +807,16 @@ class SpinMeasurements:
                 if kwargs['odmr_type'] == 'CW':
                     # Period = Sweep_time = Probe_time = 1/Mod. Sweep Rate
                     # sweep_time = kwargs['probe_time'] * 1e9 # change unit to ns
-                    sweep_rate = 1/kwargs['probe_time']
-                    gw.sg.set_mod_type(3)   # Frequency Sweep
-                    gw.sg.set_sfunction(1)  # Ramp
+                    #sweep_rate = 1/kwargs['probe_time']
+                    #gw.sg.set_mod_type(3)   # Frequency Sweep
+                    #gw.sg.set_sfunction(1)  # Ramp
                     # Sweep deviation marks the range of frequencies by deviating +/- the dev. frequency
                     # sweep_deviation = (kwargs['stop_freq'] - kwargs['start_freq'])/2
-                    sweep_dev = kwargs['sweep_dev']
-                    gw.sg.set_sdeviation(sweep_dev)
-                    sweep_rate = kwargs['sweep_rate']
-                    gw.sg.set_srate(sweep_rate)
-                    cw_odmr_seq = gw.ps.CW_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9)
+                    #sweep_dev = kwargs['sweep_dev']
+                    #gw.sg.set_sdeviation(sweep_dev)
+                    #sweep_rate = kwargs['sweep_rate']
+                    #gw.sg.set_srate(sweep_rate)
+                    cw_odmr_seq = gw.ps.CW_ODMR_R(kwargs['runs'], kwargs['probe_time']*1e9, kwargs['read_time']*1e9)
                 elif kwargs['odmr_type']=='Pulsed':
                     sweep_rate = 1/kwargs['probe_time']
                     pul_odmr_seq = gw.ps.Pulsed_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9, kwargs['read_time']*1e9)
@@ -841,11 +841,17 @@ class SpinMeasurements:
             gated_detector_vch = gw.daq.gated_ch(spcm_ch, gate_ch, -gate_ch)
             # We get the virtual channel
             gated_detector = gated_detector_vch.getChannel()
-            cbm = gw.daq.start_cbm(click_channel=gated_detector, begin_channel=sync_ch, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
-            #gw.sg.set_mod_toggle(1)
+            gw.daq.start_cbm(click_channel=gated_detector, begin_channel=sync_ch, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
+            
+            # Set the sig. gen parameters.
+            gw.sg.set_rf_amplitude(kwargs['mw_power'])
+            gw.sg.set_mod_type(6) # 'IQ' modulation : 6
             gw.sg.set_rf_toggle(1)
+            gw.sg.set_mod_toggle(1)
+            gw.sg.set_qmod_function(5) # 'IQ modulation function': External
+            
 
-            ready = False
+            #ready = False
 
             """ # Data collection
             while ready is False:
@@ -874,27 +880,31 @@ class SpinMeasurements:
                         else:
                             raise ValueError("Invalid ODMR signal generator")
                         if kwargs['odmr_type'] == 'CW':
-
+                            #gw.sg.set_mod_toggle(1)
                             # We stream the corresponding sequence
-                            gw.daq.CBM_start() #cbm.start()
+                            gw.daq.CBM_sFor(8e12) #cbm.start()
                             gw.daq.sync() # or self.tagger.sync()
                             gw.ps.stream(cw_odmr_seq, 1) 
-                    
+
+                            ready = False
+
                             # Data collection
                             while ready is False:
                                 time.sleep(0.2)
+                                print("Waiting for CBM to be ready...")
                                 ready = gw.daq.cbm_ready()
                                 counts = obtain(gw.daq.count_BM())
                                 sig, bg = self.digital_math(counts, 'ODMR')
                                 # Data processing (normalization, etc.) 
                         elif kwargs['odmr_type'] == 'Pulsed':
-                            gw.daq.CBM_start()
+                            gw.daq.CBM_sFor(8e12)
                             gw.daq.sync()
                             gw.ps.stream(pul_odmr_seq, kwargs['runs'])
                             
                             # Data collection
                             while ready is False:
                                 time.sleep(0.2)
+                                print("Waiting for CBM to be ready...")
                                 ready = gw.daq.cbm_ready()
                                 counts = obtain(gw.daq.count_BM())
                                 sig, bg = self.digital_math(counts, 'Pulsed ODMR')
@@ -921,7 +931,9 @@ class SpinMeasurements:
                         if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
                             gw.daq.free_time_tagger()
                             gw.sg.set_rf_toggle(0)
+                            print(6)
                             gw.sg.set_mod_toggle(0)
+                            print(7)
                             gw.ps.ps_reset()
                             gw.laser.off()
                             print('the GUI has asked us nicely to exit')
@@ -930,9 +942,11 @@ class SpinMeasurements:
 
                 # We turn OFF the mw signal (modulation and amplitude)
                 gw.sg.set_rf_toggle(0)
+                print(8)
                 gw.sg.set_mod_toggle(0)
+                print(9)
                 gw.laser.off()
-                gw.ps.gate_off()
+                gw.ps.just_gate_off()
                 gw.ps.ps_reset()
                 gw.daq.free_time_tagger()
 
