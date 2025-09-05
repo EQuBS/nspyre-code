@@ -17,6 +17,8 @@ from rpyc.utils.classic import obtain
 
 from TimeTagger import CHANNEL_UNUSED
 
+from pulsestreamer import PulseStreamer, OutputState 
+
 # from drivers.pulses import Pulses
 
 # Added Artif. by Rolando to make it work... xd
@@ -797,7 +799,14 @@ class SpinMeasurements:
             background_sweeps = StreamingList()
 
             # We get the laser ready to be triggered by the Pulse Streamer
-            gw.ps.gate_on()
+            # PS Channels
+            laser_ch = 7
+            gate_ch = 0
+            sync_ch = 1
+            spcm_gate = 3
+
+            gw.ps.constant(OutputState([spcm_gate, laser_ch], 0.0, 0.0))
+            #print("Pulse Streamer type check: ", type(gw.ps))
             gw.laser.cw_mode()
             gw.laser.on()
 
@@ -946,7 +955,7 @@ class SpinMeasurements:
                 gw.sg.set_mod_toggle(0)
                 print(9)
                 gw.laser.off()
-                gw.ps.just_gate_off()
+                gw.ps.constant(OutputState([], 0.0, 0.0))
                 gw.ps.ps_reset()
                 gw.daq.free_time_tagger()
 

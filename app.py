@@ -95,7 +95,7 @@ def main():
                 'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano], stretch=(1, 1)),
                 'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
                 'XZ-Scan': MainWidgetItem(template.gui.gui_ScanXZ, 'ScanXZ', stretch=(1, 1)),
-                'ODMR': MainWidgetItem(template.gui.gui_ODMR, 'ODMR_Widget', stretch=(1, 1)),
+                'ODMR': MainWidgetItem(template.gui.gui_ODMR, 'ODMR_Widget', args=[pulse_streamer_driver], stretch=(1, 1)),
                 'Rabi': MainWidgetItem(template.gui.gui_Rabi, 'RabiWidget', stretch=(1, 1)),
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(

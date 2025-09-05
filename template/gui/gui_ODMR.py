@@ -12,7 +12,7 @@ ODMR measurement.
 
 """
 import numpy as np
-from nspyre import FlexLinePlotWidget
+from nspyre import FlexLinePlotWidget, InstrumentGateway
 from nspyre import ExperimentWidget
 from nspyre import DataSink
 from pyqtgraph import SpinBox
@@ -23,7 +23,8 @@ import sys
 sys.path.append('../experiments')
 
 class ODMR_Widget(ExperimentWidget):
-    def __init__(self):
+    def __init__(self, pulse_streamer_driver):
+        self.ps = pulse_streamer_driver
         params_config = {
             'start_freq': {
                 'display_text': 'Start Frequency',
@@ -178,14 +179,29 @@ class ODMR_Widget(ExperimentWidget):
                 'widget': QtWidgets.QLineEdit('ODMR'),
             },
         }
-
+        # Gate (SPCM) on button
+        gate_on_button = QtWidgets.QPushButton('Gate/Laser On ')
+        gate_on_button.clicked.connect(lambda: self.ps.gate_on())
+        # Gate (SPCM) off button
+        gate_off_button = QtWidgets.QPushButton('Gate/Laser Off')
+        gate_off_button.clicked.connect(lambda: self.ps.gate_off())
         super().__init__(params_config, 
                         sm,  # No specific measurements class
                         'SpinMeasurements',  # No specific class name
                         'odmr_run_R',  # No specific run method
-                        title='ODMR')
-"""
+                        title='ODMR')\
 
+"""                        
+layout = QtWidgets.QGridLayout()
+# Gate (SPCM) on button
+gate_on_button = QtWidgets.QPushButton('Gate/Laser On ')
+gate_on_button.clicked.connect(lambda: self.ps.gate_on())
+layout.addWidget(gate_on_button, 0, 1)
+# Gate (SPCM) off button
+gate_off_button = QtWidgets.QPushButton('Gate/Laser Off')
+gate_off_button.clicked.connect(lambda: self.ps.gate_off())
+layout.addWidget(gate_off_button, 0, 2)
+self.setLayout(layout)
 """
 def process_ODMR_data(sink: DataSink):
     """Subtract the signal from background trace and add it as a new 'diff' dataset."""

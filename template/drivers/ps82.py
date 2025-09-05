@@ -4,6 +4,7 @@ import time
 from rpyc.utils.classic import obtain
 import typing as t
 
+
 class PS82():
     def __init__(self):
         super().__init__()
@@ -429,7 +430,7 @@ class PS82():
            init_laser_time = self.laser_time
            laser_patt = [(init_laser_time, 1), (4000, 0), (init_laser_time, 1), (4000, 0)]
            sync_patt = [(10, 1), (8000-10, 0)]
-           gate_patt = [(read_time, 1), (4000-read_time, 0) (read_time, 1), (4000-read_time, 0)]
+           gate_patt = [(read_time, 1), (4000-read_time, 0), (read_time, 1), (4000-read_time, 0)]
            mw_I_patt = [(init_laser_time, 0), (probe_time, self.IQ_ON[0]), (4000 - init_laser_time - probe_time, 0)]
            mw_Q_patt = [(init_laser_time, 0), (probe_time, self.IQ_ON[1]), (4000 - init_laser_time - probe_time, 0)]
 
