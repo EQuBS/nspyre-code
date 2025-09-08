@@ -54,11 +54,10 @@ class PS82():
     def convert_type(self, arg: t.Any, converter: _T) -> _T:
         return converter(arg)
 
-    def stream(self, seq, n_runs):
+    def stream(self, seq, n_runs=1, final=OutputState.ZERO()):
         seq = obtain(seq)
         # print('type(seq) is:', type(seq))
         # print('seq is:', seq)
-        final = OutputState.ZERO()
         self.ps.stream(seq,n_runs, final)
 
     def stream_wfm(self, wfm, wfm_onoff=1, n_runs='inf'):

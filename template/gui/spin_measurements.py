@@ -898,7 +898,7 @@ class SpinMeasurements:
                             gw.daq.CBM_start()
                             gw.daq.sync() # or self.tagger.sync()
                             #final = OutputState.ZERO()
-                            gw.ps.stream(cw_odmr_seq, kwargs['runs'])
+                            gw.ps.stream(cw_odmr_seq)
 
                             t0 = time.time()
                             timeout = 10.0
@@ -911,6 +911,7 @@ class SpinMeasurements:
                                 ready = gw.daq.cbm_ready()
                                 try:
                                     counts = obtain(gw.daq.count_BM())
+                                    gw.sg.get_frequency()
                                     print("Shape of counts array: ", np.shape(counts))
                                     sig, bg = self.digital_math(counts, 'ODMR')
                                     # Data processing (normalization, etc.)
