@@ -799,11 +799,11 @@ class SpinMeasurements:
             background_sweeps = StreamingList()
 
             # We get the laser ready to be triggered by the Pulse Streamer
-            # PS Channels
-            #laser_ch = 7
-            ps_gate_ch = 0
-            ps_sync_ch = 1
-            #spcm_gate = 3
+            # PS Channels, used in ps82.py: cw_odmr_r()
+            # laser_ch = 7
+            # ps_gate_ch = 0
+            # ps_sync_ch = 1
+            # spcm_gate = 3
 
             #gw.ps.constant(OutputState([spcm_gate, laser_ch], 0.0, 0.0))
             gw.ps.gate_on()
@@ -845,7 +845,7 @@ class SpinMeasurements:
             tt_spcm_ch = 3
 
             #gw.daq.set_trigger_level(spcm, 1.3)
-            gw.daq.set_trigger_level(tt_gate_ch, 1.3)
+            gw.daq.set_trigger_level([tt_gate_ch, tt_sync_ch], 1.3)
             gw.daq.set_trigger_level(tt_spcm_ch, 1.1)
 
             gated_detector_vch = gw.daq.gated_ch(tt_spcm_ch, tt_gate_ch, -tt_gate_ch)
@@ -910,6 +910,7 @@ class SpinMeasurements:
                                 ready = gw.daq.cbm_ready()
                                 try:
                                     counts = obtain(gw.daq.count_BM())
+                                    print("Shape of counts array: ", np.shape(counts))
                                     sig, bg = self.digital_math(counts, 'ODMR')
                                     # Data processing (normalization, etc.)
                                 except Exception as e:
