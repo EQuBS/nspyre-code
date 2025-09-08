@@ -800,13 +800,14 @@ class SpinMeasurements:
 
             # We get the laser ready to be triggered by the Pulse Streamer
             # PS Channels
-            laser_ch = 7
-            gate_ch = 0
-            sync_ch = 1
-            spcm_gate = 3
+            #laser_ch = 7
+            ps_gate_ch = 0
+            ps_sync_ch = 1
+            #spcm_gate = 3
 
-            gw.ps.constant(OutputState([spcm_gate, laser_ch], 0.0, 0.0))
-            #print("Pulse Streamer type check: ", type(gw.ps))
+            #gw.ps.constant(OutputState([spcm_gate, laser_ch], 0.0, 0.0))
+            gw.ps.gate_on()
+            print("PS 'gate_on()' type check: ", type(gw.ps.gate_on()))
             gw.laser.cw_mode()
             gw.laser.on()
 
@@ -839,18 +840,18 @@ class SpinMeasurements:
             
 
             # We assign Trigger Levels, and counting event in the Time Tagger
-            gate_ch = 1
-            sync_ch = 2
-            spcm_ch = 3
+            tt_gate_ch = 1
+            tt_sync_ch = 2
+            tt_spcm_ch = 3
 
             #gw.daq.set_trigger_level(spcm, 1.3)
-            gw.daq.set_trigger_level(spcm_ch, 1.3)
-            gw.daq.set_trigger_level(spcm_ch, 1.1)
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)
 
-            gated_detector_vch = gw.daq.gated_ch(spcm_ch, gate_ch, -gate_ch)
+            gated_detector_vch = gw.daq.gated_ch(tt_spcm_ch, tt_gate_ch, -tt_gate_ch)
             # We get the virtual channel
             gated_detector = gated_detector_vch.getChannel()
-            gw.daq.start_cbm(click_channel=gated_detector, begin_channel=sync_ch, end_channel=CHANNEL_UNUSED, n_values=kwargs['num_points'])
+            #gw.daq.start_cbm(click_channel=gated_detector, begin_channel=tt_sync_ch, end_channel=CHANNEL_UNUSED, n_values=1)
             
             # Set the sig. gen parameters.
             gw.sg.set_rf_amplitude(kwargs['mw_power'])
@@ -891,21 +892,36 @@ class SpinMeasurements:
                         if kwargs['odmr_type'] == 'CW':
                             #gw.sg.set_mod_toggle(1)
                             # We stream the corresponding sequence
-                            gw.daq.CBM_sFor(8e12) #cbm.start()
+                            #gw.daq.CBM_sFor(8e12) #cbm.start()
+                            gw.daq.start_cbm(click_channel=gated_detector, begin_channel=tt_sync_ch, end_channel=CHANNEL_UNUSED, n_values=1)
+                            gw.daq.CBM_start()
                             gw.daq.sync() # or self.tagger.sync()
-                            gw.ps.stream(cw_odmr_seq, 1) 
+                            #final = OutputState.ZERO()
+                            gw.ps.stream(cw_odmr_seq, kwargs['runs'])
 
+                            t0 = time.time()
+                            timeout = 10.0
                             ready = False
-
+                            print("DEBUG: entering cbm wait loop")
                             # Data collection
-                            while ready is False:
+                            while not ready and (time.time() - t0) < timeout:
                                 time.sleep(0.2)
-                                print("Waiting for CBM to be ready...")
+                                #print("Waiting for CBM_CW to be ready...")
                                 ready = gw.daq.cbm_ready()
-                                counts = obtain(gw.daq.count_BM())
-                                sig, bg = self.digital_math(counts, 'ODMR')
-                                # Data processing (normalization, etc.) 
-                        elif kwargs['odmr_type'] == 'Pulsed':
+                                try:
+                                    counts = obtain(gw.daq.count_BM())
+                                    sig, bg = self.digital_math(counts, 'ODMR')
+                                    # Data processing (normalization, etc.)
+                                except Exception as e:
+                                    print(f"Error occurred while obtaining counts: {e}")
+                                    counts = f"count_BM() raised: {e}"
+                                print(f"DEBUG cbm_ready: {ready} | counts type: {type(counts)} | counts: {counts}")
+                            if not ready:
+                                print("ERROR: CBM did not become ready within timeout.")
+                            else:
+                                print("CBM ready, processing.")
+                            """ 
+                            elif kwargs['odmr_type'] == 'Pulsed':
                             gw.daq.CBM_sFor(8e12)
                             gw.daq.sync()
                             gw.ps.stream(pul_odmr_seq, kwargs['runs'])
@@ -917,7 +933,7 @@ class SpinMeasurements:
                                 ready = gw.daq.cbm_ready()
                                 counts = obtain(gw.daq.count_BM())
                                 sig, bg = self.digital_math(counts, 'Pulsed ODMR')
-                                # Data processing (normalization, etc.)
+                                # Data processing (normalization, etc.) """
                         # Record of photon counts
                         signal_sweeps[-1][1][f] = sig
                         background_sweeps[-1][1][f] = bg  
@@ -938,7 +954,7 @@ class SpinMeasurements:
 
                         #
                         if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                            gw.daq.free_time_tagger()
+                            #gw.daq.free_time_tagger()
                             gw.sg.set_rf_toggle(0)
                             print(6)
                             gw.sg.set_mod_toggle(0)
@@ -955,7 +971,8 @@ class SpinMeasurements:
                 gw.sg.set_mod_toggle(0)
                 print(9)
                 gw.laser.off()
-                gw.ps.constant(OutputState([], 0.0, 0.0))
+                #gw.ps.constant(OutputState([], 0.0, 0.0))
+                gw.ps.gate_off()
                 gw.ps.ps_reset()
                 gw.daq.free_time_tagger()
 
