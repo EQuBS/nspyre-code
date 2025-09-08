@@ -845,7 +845,8 @@ class SpinMeasurements:
             tt_spcm_ch = 3
 
             #gw.daq.set_trigger_level(spcm, 1.3)
-            gw.daq.set_trigger_level([tt_gate_ch, tt_sync_ch], 1.3)
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)
+            gw.daq.set_trigger_level(tt_sync_ch, 1.3)
             gw.daq.set_trigger_level(tt_spcm_ch, 1.1)
 
             gated_detector_vch = gw.daq.gated_ch(tt_spcm_ch, tt_gate_ch, -tt_gate_ch)
