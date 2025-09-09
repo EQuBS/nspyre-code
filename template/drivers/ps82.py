@@ -199,7 +199,7 @@ class PS82():
         self.ps.constant(OutputState([], 0.0, 0.0))
 
     def just_gate_off(self):
-        self.ps.constant(OutputState([self.channel_dict["gate"]], 0.0, 0.0))
+        self.ps.constant(OutputState([], 0.0, 0.0))
 
     def gate_on_cw_odmr(self):
         # Gate on for the ODMR (CW) experiment
@@ -396,7 +396,8 @@ class PS82():
         seq_on = self.ps.createSequence()
         #seq_off = self.ps.createSequence()
         
-        laser_patt = [((probe_time)*runs + self.clock_time, 1)]
+        laser_patt = [((probe_time)*runs + read_time, 1)]
+        spcm_patt = [(2*probe_time*runs, 1)]
         gate_patt  = [(read_time, 1), (probe_time-read_time, 0), (read_time, 1), (probe_time-read_time, 0)]*runs
         mw_I_patt = [(probe_time-100, self.IQpx[0]), (probe_time+100, self.IQ0[0])]*runs # 100 ns mw buffer time
         mw_Q_patt = [(probe_time-100, self.IQpx[1]), (probe_time+100, self.IQ0[1])]*runs
@@ -404,7 +405,7 @@ class PS82():
         #gate_patt = [(probe_time, 1)]
 
         seq_on.setDigital(self.channel_r['laser'], laser_patt)
-        seq_on.setDigital(self.channel_r['spcm_gate'], laser_patt)
+        seq_on.setDigital(self.channel_r['spcm_gate'], spcm_patt)
         seq_on.setDigital(self.channel_r['sync'], sync_patt)
         seq_on.setDigital(self.channel_r['vrt_gate'], gate_patt)
         seq_on.setAnalog(0, mw_I_patt)

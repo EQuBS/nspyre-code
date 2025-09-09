@@ -806,10 +806,13 @@ class SpinMeasurements:
             # spcm_gate = 3
 
             #gw.ps.constant(OutputState([spcm_gate, laser_ch], 0.0, 0.0))
-            gw.ps.gate_on()
-            print("PS 'gate_on()' type check: ", type(gw.ps.gate_on()))
+            #gw.ps.gate_on()
+            #print("PS 'gate_on()' type check: ", type(gw.ps.gate_on()))
             gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(5) # Set laser power to 5%
             gw.laser.on()
+            #gw.ps.just_gate_on() # We open the SPCM gate
 
             # We set the appropriate Sig. Generator
             if kwargs['odmr_sg'] == 'SRS':
@@ -963,6 +966,9 @@ class SpinMeasurements:
                             gw.sg.set_mod_toggle(0)
                             print(7)
                             gw.ps.ps_reset()
+                            gw.laser.get_power()
+                            gw.laser.set_power(0)
+                            gw.ps.just_gate_off() # We close the SPCM gate
                             gw.laser.off()
                             print('the GUI has asked us nicely to exit')
                             return
