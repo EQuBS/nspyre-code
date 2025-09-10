@@ -897,7 +897,7 @@ class SpinMeasurements:
                             #gw.sg.set_mod_toggle(1)
                             # We stream the corresponding sequence
                             #gw.daq.CBM_sFor(8e12) #cbm.start()
-                            gw.daq.start_cbm(click_channel=gated_detector, begin_channel=tt_sync_ch, end_channel=CHANNEL_UNUSED, n_values=1)
+                            gw.daq.start_cbm(click_channel=gated_detector, begin_channel=tt_sync_ch, end_channel=CHANNEL_UNUSED, n_values=10)
                             gw.daq.CBM_start()
                             gw.daq.sync() # or self.tagger.sync()
                             #final = OutputState.ZERO()

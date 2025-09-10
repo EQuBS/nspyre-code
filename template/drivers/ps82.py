@@ -54,13 +54,13 @@ class PS82():
     def convert_type(self, arg: t.Any, converter: _T) -> _T:
         return converter(arg)
 
-    def stream(self, seq, n_runs=1, final=OutputState([3], 0.0, 0.0)):
+    def stream(self, seq, n_runs=1):
         seq = obtain(seq)
         # print('type(seq) is:', type(seq))
         # print('seq is:', seq)
         # For cw_odmr_r()
         #final = OutputState([3], 0.0, 0.0) # We leave off the SPCM gate at the end of the sequence
-        self.ps.stream(seq, n_runs, final)
+        self.ps.stream(seq, n_runs)
 
     def stream_wfm(self, wfm, wfm_onoff=1, n_runs='inf'):
         try:
@@ -392,6 +392,8 @@ class PS82():
 
         return seqs
     
+    """ def plot_seq(self, seq):
+        seq.plot() """
     
     def CW_ODMR_R(self, runs, probe_time, read_time):
     
@@ -416,6 +418,7 @@ class PS82():
 
         #seq.setAnalog(0, mw_I_patt)
         #seq.setAnalog(1, mw_Q_patt)
+        seq_on.plot()
 
         return seq_on
     
