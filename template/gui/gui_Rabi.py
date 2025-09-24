@@ -45,10 +45,10 @@ class RabiWidget(ExperimentWidget):
             'freq': {
                 'display_text': 'MW Freq.: ',
                 'widget': SpinBox(
-                    value = 2.87e9,
+                    value = 2.875e9,
                     suffix = 'Hz',
                     siPrefix = True,
-                    bounds = (100e3, 20e9),
+                    bounds = (100.000e3, 6.000e9),
                     dec = True,
                 ),
             },
@@ -56,10 +56,10 @@ class RabiWidget(ExperimentWidget):
             'rf_power': {
                 'display_text': 'RF Power: ',
                 'widget': SpinBox(
-                    value = -10,
+                    value = -18,
                     suffix = 'dBm',
                     siPrefix = False,
-                    bounds = (None, 5),
+                    bounds = (None, -15),
                 ),
             },
             'start': {
@@ -76,7 +76,7 @@ class RabiWidget(ExperimentWidget):
             'stop': {
                 'display_text': 'Stop MW Pulse Time: ',
                 'widget': SpinBox(
-                    value = 200e-9,
+                    value = 500e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
@@ -97,7 +97,7 @@ class RabiWidget(ExperimentWidget):
             'init_time': {
                 'display_text': 'Init. Time: ',
                 'widget': SpinBox(
-                    value = 2e-6,
+                    value = 8e-6,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (5e-7, None),
@@ -107,7 +107,7 @@ class RabiWidget(ExperimentWidget):
             'read_time': {
                 'display_text': 'Readout Time: ',
                 'widget': SpinBox(
-                    value = 400e-9,
+                    value = 600e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (10e-9, None),
@@ -127,7 +127,7 @@ class RabiWidget(ExperimentWidget):
             'read_wait': {
                 'display_text': 'Read Wait: ',
                 'widget': SpinBox(
-                    value = 0,
+                    value = 100e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
@@ -167,7 +167,7 @@ class RabiWidget(ExperimentWidget):
         super().__init__(params_config, 
                         sm,
                         'SpinMeasurements',
-                        'rabi_run',
+                        'rabi_run_R',
                         title='Rabi')
 
 def process_Rabi_data(sink: DataSink):

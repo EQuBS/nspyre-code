@@ -1,5 +1,6 @@
 import TimeTagger as tt
-from TimeTagger import CHANNEL_UNUSED 
+from TimeTagger import CHANNEL_UNUSED
+from rpyc.utils.classic import obtain 
 
 class tt20:
     
@@ -24,7 +25,7 @@ class tt20:
     # - binwidth: width of each bin in ps
     # - n_values: number of bins to store
     # - measurement_duration: duration of the measurement in ps
-    def start_counter(self, channels, binwidth, n_values, measurement_duration, tagger=None):
+    def start_counter(self, channels, binwidth, n_values, tagger=None): # Test took measurement duration
         if tagger is None:
             tagger = self.tagger
         try:
@@ -43,8 +44,14 @@ class tt20:
             except Exception as e:
                 print(f"Error accessing tagger: {e}")
 
-        self.counter.startFor(measurement_duration)
+        #self.counter.startFor(measurement_duration)
         
+    def sFor_Counter(self, measurement_duration):
+        self.counter.startFor(measurement_duration)
+
+    def wait_until_counter(self):
+        self.counter.waitUntilFinished(timeout=-1)
+
     #runs counter measurement for specified duration and returns data  
     #*This method must be run for Time Tagger to run the measurement for the specified duration*
     def get_counter_data(self):
@@ -111,6 +118,7 @@ class tt20:
     def CBM_sFor(self, duration):
         """startFor() function for CountBetweenMarkers event."""
         self.cbm.startFor(duration)
+        self.cbm.waitUntilFinished(duration)
 
     #Counts between marked events, introd. 6/27/2025 by Rolando
     def count_BM(self):
@@ -127,7 +135,7 @@ class tt20:
         try:
             #self.cbm.waitUntilFinished()
             data = self.cbm.getData()
-            return data
+            return obtain(data)
         except AttributeError:
             raise AttributeError("Your TimeTagger module does not have CountBetweenMarkers. Please check your TimeTagger version.")
 

@@ -55,6 +55,16 @@ class ODMR_Widget(ExperimentWidget):
                     dec=True,
                 ),
             },
+            'dwell_time': {
+                'display_text': 'Dwell Time',
+                'widget': SpinBox(
+                    value = 200e-3,
+                    suffix = 's',
+                    siPrefix = True,
+                    bounds = (2e-9, None),
+                    dec=True,
+                ),
+            },
             'runs': {
                 'display_text': 'Runs (per pt.)',
                 'widget': SpinBox(

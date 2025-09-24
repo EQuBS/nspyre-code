@@ -52,7 +52,8 @@ class SpinMeasurements:
         try:
             #print("check entered read function")
                 #sampling_time = 50000 #gw.ps.sampling_time # in [ns] , Introd. sampl. time as an argument to the read function
-            gw.daq.start_counter([3], sampling_time, runs, sampling_time*runs)
+            gw.daq.start_counter([3], sampling_time, runs) # took , sampling_time*runs 
+            gw.daq.sFor_Counter(sampling_time*runs)
         except:
             print("DAQ TASK ERROR!")
             
@@ -151,8 +152,8 @@ class SpinMeasurements:
             #return sig_array, bg_array
             #return sig_array
         elif exp_type == 'Rabi' or exp_type == 'T2' or exp_type == 'MW_T1' or exp_type == 'Correlation Spectroscopy':
-            sig_all = diff_array[::4] # single integrated data point for each MW on/off window
-            bg_all = diff_array[2::4]
+            sig_all = diff_array[::2] # single integrated data point for each MW on/off window
+            bg_all = diff_array[1::2]
             sig_array = np.ones(pts) # bright data array
             bg_array = np.ones(pts) # dark data array
             for i in range(pts):
@@ -805,6 +806,11 @@ class SpinMeasurements:
             # ps_sync_ch = 1
             # spcm_gate = 3
 
+            # We define parameters 
+            dwell_time = kwargs['dwell_time'] # in seconds
+            n_bins = 10
+            bin_width = dwell_time/n_bins # in ms
+
             #gw.ps.constant(OutputState([spcm_gate, laser_ch], 0.0, 0.0))
             #gw.ps.gate_on()
             #print("PS 'gate_on()' type check: ", type(gw.ps.gate_on()))
@@ -818,18 +824,7 @@ class SpinMeasurements:
             if kwargs['odmr_sg'] == 'SRS':
                 # We create the Pulse Streamer seq.
                 if kwargs['odmr_type'] == 'CW':
-                    # Period = Sweep_time = Probe_time = 1/Mod. Sweep Rate
-                    # sweep_time = kwargs['probe_time'] * 1e9 # change unit to ns
-                    #sweep_rate = 1/kwargs['probe_time']
-                    #gw.sg.set_mod_type(3)   # Frequency Sweep
-                    #gw.sg.set_sfunction(1)  # Ramp
-                    # Sweep deviation marks the range of frequencies by deviating +/- the dev. frequency
-                    # sweep_deviation = (kwargs['stop_freq'] - kwargs['start_freq'])/2
-                    #sweep_dev = kwargs['sweep_dev']
-                    #gw.sg.set_sdeviation(sweep_dev)
-                    #sweep_rate = kwargs['sweep_rate']
-                    #gw.sg.set_srate(sweep_rate)
-                    cw_odmr_seq = gw.ps.CW_ODMR_R(kwargs['runs'], kwargs['probe_time']*1e9, kwargs['read_time']*1e9)
+                    cw_odmr_seq = gw.ps.CW_ODMR_R(dwell_time*1e9, kwargs['runs'])
                 elif kwargs['odmr_type']=='Pulsed':
                     sweep_rate = 1/kwargs['probe_time']
                     pul_odmr_seq = gw.ps.Pulsed_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9, kwargs['read_time']*1e9)
@@ -863,24 +858,11 @@ class SpinMeasurements:
             gw.sg.set_rf_toggle(1)
             gw.sg.set_mod_toggle(1)
             gw.sg.set_qmod_function(5) # 'IQ modulation function': External
-            
 
-            #ready = False
-
-            """ # Data collection
-            while ready is False:
-                time.sleep(0.2)
-                ready = gw.daq.cbm_ready()
-                counts = gw.daq.count_BM() """
-
-            # We get the time array for the CBM measurement
-            #time = cbm.getIndex()
-
-            # Frequency array
-            #freq = np.linspace(2.87e9 - sweep_dev, 2.87e9 + sweep_dev, kwargs['num_points'])
 
             with tqdm(total = kwargs['iterations']) as pbar:
                 for iter in range(kwargs['iterations']):
+                    print(f"Iteration {iter + 1} of {kwargs['iterations']}")
                     sig_counts = np.empty(kwargs['num_points'])
                     sig_counts[:] = np.nan
                     signal_sweeps.append(np.stack([frequencies/1e9, sig_counts]))
@@ -894,14 +876,16 @@ class SpinMeasurements:
                         else:
                             raise ValueError("Invalid ODMR signal generator")
                         if kwargs['odmr_type'] == 'CW':
-                            #gw.sg.set_mod_toggle(1)
-                            # We stream the corresponding sequence
-                            #gw.daq.CBM_sFor(8e12) #cbm.start()
-                            gw.daq.start_cbm(click_channel=gated_detector, begin_channel=tt_sync_ch, end_channel=CHANNEL_UNUSED, n_values=10)
-                            gw.daq.CBM_start()
-                            gw.daq.sync() # or self.tagger.sync()
+                            counter = gw.daq.start_counter([tt_spcm_ch], bin_width*1E3, n_bins)
+                            n_runs = 1
+                            gw.ps.stream(obtain(cw_odmr_seq), n_runs)
+                            gw.daq.sFor_Counter(int(dwell_time*1E12))
+                            gw.daq.wait_until_finished() 
+                            # gw.daq.start_cbm(click_channel=gated_detector, begin_channel=tt_sync_ch, end_channel=CHANNEL_UNUSED, n_values=10)
+                            # gw.daq.CBM_sFor(2E12)
+                            # gw.daq.sync() # or self.tagger.sync()
                             #final = OutputState.ZERO()
-                            gw.ps.stream(cw_odmr_seq)
+                            
 
                             t0 = time.time()
                             timeout = 10.0
@@ -1643,6 +1627,120 @@ class SpinMeasurements:
                 gw.sg.set_mod_toggle(0)
             else:
                 gw.windfreak.ch0_off()
+
+    def rabi_run_R(self, **kwargs):  # Rolando version
+        '''
+        Developed by Tian-Xing in Sept.2023
+        '''
+        with InstrumentGateway() as gw, DataSource("Rabi") as rabi_data:
+            
+            # pi pulse durations that will be swept over in the Rabi measurement (converted to ns)
+            mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
+            #num_mw = len(mw_times)
+
+            signal_sweeps = StreamingList()
+            background_sweeps = StreamingList()
+
+            # pulse streamer sequence
+            if kwargs['rabi_type'] == "SRS":
+                print("USING SRS FOR RABI MEASUREMENT.")
+                ps_seq = gw.ps.Rabi(mw_times, kwargs['xy'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9, kwargs['seq_gap']*1e9)
+                # Setup the MW
+                gw.sg.set_frequency(kwargs['freq'])
+                gw.sg.set_rf_amplitude(kwargs['rf_power'])
+                gw.sg.set_mod_type(6)
+                gw.sg.set_rf_toggle(1)
+                gw.sg.set_mod_toggle(1)
+                gw.sg.set_qmod_function(5)
+            else:
+                raise ValueError("Rabi Type must be SRS!")
+            
+            # set initial parameters for instrument server devices
+            # Turn on the laser
+            gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(10) # set laser power to 10% 
+            gw.laser.on()
+            
+
+            """ Time Tagger Channel, Trigger Level and Counting Event Setup """
+            tt_gate_ch = 1
+            tt_sync_ch = 2
+            tt_spcm_ch = 3
+
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)   # Gate channel trigger level
+            gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
+
+            runs = kwargs['runs']
+
+            with tqdm(total = kwargs['iters']) as pbar:
+
+                for iter in range(kwargs['iters']):
+
+                    gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, CHANNEL_UNUSED, 2*len(mw_times)*runs)
+                    gw.daq.CBM_start()
+                    gw.daq.sync()
+
+                    gw.ps.stream(obtain(ps_seq), runs)
+                    ready = False
+
+                    while ready is False:
+                        time.sleep(.2)
+                        ready = gw.daq.cbm_ready()
+                        rabi_result = gw.daq.count_BM()
+
+                    rabi_result = obtain(rabi_result)
+                    # partition buffer into signal and background datasets
+                    print("Rabi result sample:", rabi_result[:10])
+                    sig_array, bg_array = self.digital_math(rabi_result, 'Rabi', kwargs['num_pts'])
+                    
+                    
+                    # correct the y-axis data ordering for plots
+                    # sig_array = np.array([sig_array[i] for i in index_order])
+                    # bg_array = np.array([bg_array[i] for i in index_order])
+                    #print('mw_times_ordered is: \n',mw_times_ordered)
+                    signal_sweeps.append(np.stack([mw_times, sig_array]))
+                    background_sweeps.append(np.stack([mw_times, bg_array]))
+                    # notify the streaminglist that this entry has updated so it will be pushed to the data server
+                    signal_sweeps.updated_item(-1)
+                    background_sweeps.updated_item(-1)
+
+                    
+                    rabi_data.push({'params': {'mw_num': kwargs['num_pts'], 'iter_num': kwargs['iters'],'runs_num': kwargs['runs']},
+                                    'title': 'Rabi',
+                                    'xlabel': 'MW Time (ns)',
+                                    'ylabel': 'Counts',
+                                    'datasets': {'signal' : signal_sweeps,
+                                                'background': background_sweeps}
+                    })
+                    if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                        # gw.daq.free_time_tagger()
+                        gw.sg.set_rf_toggle(0)
+                        gw.sg.set_mod_toggle(0)
+                        gw.ps.ps_reset()
+                        gw.laser.get_power()
+                        gw.laser.off()
+                        gw.laser.set_power(0)
+                        # if kwargs['rabi_type'] == "SRS":
+                        #else:
+                        # gw.windfreak.ch0_off()
+                        print('the GUI has asked us nicely to exit')
+                        return
+
+                    pbar.update(1)
+
+            # We turn OFF the mw signal (modulation and amplitude)        
+            gw.sg.set_rf_toggle(0)
+            gw.sg.set_mod_toggle(0)
+            gw.laser.off()
+            gw.laser.get_power()
+            gw.laser.set_power(0)
+            gw.ps.ps_reset()
+            gw.daq.free_time_tagger()
+            # if kwargs['rabi_type'] == "SRS":
+            
+            
     
     def DEER_FID_run_Evan(self, **kwargs):
         '''
