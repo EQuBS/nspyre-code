@@ -820,8 +820,6 @@ class SpinMeasurements:
                 # We set parameters for our signal generator
                 gw.sg.set_rf_amplitude(kwargs['mw_power'])
                 
-            
-            
 
             # We assign Trigger Levels, and counting event in the Time Tagger
             tt_gate_ch = 1
@@ -844,13 +842,14 @@ class SpinMeasurements:
             sig_a = np.zeros(kwargs['num_points'])
             bg_a = np.zeros(kwargs['num_points'])
 
-            if kwargs['odmr_type'] == 'CW':
-                for iter in range(kwargs['iterations']):
-                    print(f"Iteration {iter + 1} of {kwargs['iterations']}")
-                    sig = []
-                    bg = []
-                    for f, freq in enumerate(frequencies):
-                        gw.sg.set_frequency(freq)
+            for iter in range(kwargs['iterations']):
+                print(f"Iteration {iter + 1} of {kwargs['iterations']}")
+                sig = []
+                bg = []
+                for f, freq in enumerate(frequencies):
+                    gw.sg.set_frequency(freq)
+
+                    if kwargs['odmr_type'] == 'CW':
                         gw.daq.start_counter([tt_spcm_ch], bin_width*1E3, n_bins)
                         n_runs = 1
                         gw.ps.stream(obtain(cw_odmr_seq), n_runs)
@@ -862,28 +861,31 @@ class SpinMeasurements:
                         # Record of photon counts
                         signal_sweeps.append(counter_data[0][3])
                         background_sweeps.append(counter_data[0][6])
-                        # Notify the streamlist, and update it
-                        signal_sweeps.updated_item(-1)
-                        background_sweeps.updated_item(-1)
 
-                        #
-                        if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                            #gw.daq.free_time_tagger()
-                            gw.sg.set_rf_toggle(0)
-                            print(6)
-                            gw.sg.set_mod_toggle(0)
-                            print(7)
-                            gw.ps.ps_reset()
-                            gw.laser.get_power()
-                            gw.laser.set_power(0)
-                            gw.ps.just_gate_off() # We close the SPCM gate
-                            gw.laser.off()
-                            print('the GUI has asked us nicely to exit')
-                            return
+                    elif kwargs['odmr_type'] == 'Pulsed':
+                        gw.daq.
 
-                    # avg_data = (avg_data*iter + np.array(signal_sweeps))/(iter+1)
-                    sig_a = (sig_a*iter + np.array(signal_sweeps))/(iter+1)
-                    bg_a = (bg_a*iter + np.array(background_sweeps))/(iter+1)
+                    # Notify the streamlist, and update it
+                    signal_sweeps.updated_item(-1)
+                    background_sweeps.updated_item(-1)
+
+                if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                    #gw.daq.free_time_tagger()
+                    gw.sg.set_rf_toggle(0)
+                    print(6)
+                    gw.sg.set_mod_toggle(0)
+                    print(7)
+                    gw.ps.ps_reset()
+                    gw.laser.get_power()
+                    gw.laser.set_power(0)
+                    gw.ps.just_gate_off() # We close the SPCM gate
+                    gw.laser.off()
+                    print('the GUI has asked us nicely to exit')
+                    return
+
+                # avg_data = (avg_data*iter + np.array(signal_sweeps))/(iter+1)
+                sig_a = (sig_a*iter + np.array(signal_sweeps))/(iter+1)
+                bg_a = (bg_a*iter + np.array(background_sweeps))/(iter+1)
 
                 # Data push 
                 odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
