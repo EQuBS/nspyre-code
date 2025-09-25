@@ -790,35 +790,22 @@ class SpinMeasurements:
 
             # Sig. Gen. cannot allow more than 6 digits after the decimal point.
             np.set_printoptions(precision = 6)
-            
-            #sync_tag = gw.tagger.synchro()
-
-            # Set the freq. sweep
+           
             frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
             
             signal_sweeps = StreamingList()
             background_sweeps = StreamingList()
-
-            # We get the laser ready to be triggered by the Pulse Streamer
-            # PS Channels, used in ps82.py: cw_odmr_r()
-            # laser_ch = 7
-            # ps_gate_ch = 0
-            # ps_sync_ch = 1
-            # spcm_gate = 3
 
             # We define parameters 
             dwell_time = kwargs['dwell_time'] # in seconds
             n_bins = 10
             bin_width = dwell_time/n_bins # in ms
 
-            #gw.ps.constant(OutputState([spcm_gate, laser_ch], 0.0, 0.0))
-            #gw.ps.gate_on()
-            #print("PS 'gate_on()' type check: ", type(gw.ps.gate_on()))
+            # Set laser
             gw.laser.cw_mode()
             gw.laser.get_power()
             gw.laser.set_power(5) # Set laser power to 5%
             gw.laser.on()
-            #gw.ps.just_gate_on() # We open the SPCM gate
 
             # We set the appropriate Sig. Generator
             if kwargs['odmr_sg'] == 'SRS':
@@ -826,7 +813,6 @@ class SpinMeasurements:
                 if kwargs['odmr_type'] == 'CW':
                     cw_odmr_seq = gw.ps.CW_ODMR_R(dwell_time*1e9, kwargs['runs'])
                 elif kwargs['odmr_type']=='Pulsed':
-                    sweep_rate = 1/kwargs['probe_time']
                     pul_odmr_seq = gw.ps.Pulsed_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9, kwargs['read_time']*1e9)
                 else:
                     raise ValueError("Invalid ODMR type")
@@ -847,100 +833,38 @@ class SpinMeasurements:
             gw.daq.set_trigger_level(tt_sync_ch, 1.3)
             gw.daq.set_trigger_level(tt_spcm_ch, 1.1)
 
-            gated_detector_vch = gw.daq.gated_ch(tt_spcm_ch, tt_gate_ch, -tt_gate_ch)
-            # We get the virtual channel
-            gated_detector = gated_detector_vch.getChannel()
-            #gw.daq.start_cbm(click_channel=gated_detector, begin_channel=tt_sync_ch, end_channel=CHANNEL_UNUSED, n_values=1)
             
             # Set the sig. gen parameters.
             gw.sg.set_rf_amplitude(kwargs['mw_power'])
             gw.sg.set_mod_type(6) # 'IQ' modulation : 6
-            gw.sg.set_rf_toggle(1)
-            gw.sg.set_mod_toggle(1)
             gw.sg.set_qmod_function(5) # 'IQ modulation function': External
+            gw.sg.set_mod_toggle(1)
+            gw.sg.set_rf_toggle(1)            
 
+            sig_a = np.zeros(kwargs['num_points'])
+            bg_a = np.zeros(kwargs['num_points'])
 
-            with tqdm(total = kwargs['iterations']) as pbar:
+            if kwargs['odmr_type'] == 'CW':
                 for iter in range(kwargs['iterations']):
                     print(f"Iteration {iter + 1} of {kwargs['iterations']}")
-                    sig_counts = np.empty(kwargs['num_points'])
-                    sig_counts[:] = np.nan
-                    signal_sweeps.append(np.stack([frequencies/1e9, sig_counts]))
-                    bg_counts = np.empty(kwargs['num_points'])
-                    bg_counts[:] = np.nan
-                    background_sweeps.append(np.stack([frequencies/1e9, bg_counts]))
-         
+                    sig = []
+                    bg = []
                     for f, freq in enumerate(frequencies):
-                        if kwargs['odmr_sg'] == 'SRS':
-                            gw.sg.set_frequency(freq)
-                        else:
-                            raise ValueError("Invalid ODMR signal generator")
-                        if kwargs['odmr_type'] == 'CW':
-                            counter = gw.daq.start_counter([tt_spcm_ch], bin_width*1E3, n_bins)
-                            n_runs = 1
-                            gw.ps.stream(obtain(cw_odmr_seq), n_runs)
-                            gw.daq.sFor_Counter(int(dwell_time*1E12))
-                            gw.daq.wait_until_finished() 
-                            # gw.daq.start_cbm(click_channel=gated_detector, begin_channel=tt_sync_ch, end_channel=CHANNEL_UNUSED, n_values=10)
-                            # gw.daq.CBM_sFor(2E12)
-                            # gw.daq.sync() # or self.tagger.sync()
-                            #final = OutputState.ZERO()
-                            
-
-                            t0 = time.time()
-                            timeout = 10.0
-                            ready = False
-                            print("DEBUG: entering cbm wait loop")
-                            # Data collection
-                            while not ready and (time.time() - t0) < timeout:
-                                time.sleep(0.2)
-                                #print("Waiting for CBM_CW to be ready...")
-                                ready = gw.daq.cbm_ready()
-                                try:
-                                    counts = obtain(gw.daq.count_BM())
-                                    gw.sg.get_frequency()
-                                    print("Shape of counts array: ", np.shape(counts))
-                                    sig, bg = self.digital_math(counts, 'ODMR')
-                                    # Data processing (normalization, etc.)
-                                except Exception as e:
-                                    print(f"Error occurred while obtaining counts: {e}")
-                                    counts = f"count_BM() raised: {e}"
-                                print(f"DEBUG cbm_ready: {ready} | counts type: {type(counts)} | counts: {counts}")
-                            if not ready:
-                                print("ERROR: CBM did not become ready within timeout.")
-                            else:
-                                print("CBM ready, processing.")
-                            """ 
-                            elif kwargs['odmr_type'] == 'Pulsed':
-                            gw.daq.CBM_sFor(8e12)
-                            gw.daq.sync()
-                            gw.ps.stream(pul_odmr_seq, kwargs['runs'])
-                            
-                            # Data collection
-                            while ready is False:
-                                time.sleep(0.2)
-                                print("Waiting for CBM to be ready...")
-                                ready = gw.daq.cbm_ready()
-                                counts = obtain(gw.daq.count_BM())
-                                sig, bg = self.digital_math(counts, 'Pulsed ODMR')
-                                # Data processing (normalization, etc.) """
+                        gw.sg.set_frequency(freq)
+                        gw.daq.start_counter([tt_spcm_ch], bin_width*1E3, n_bins)
+                        n_runs = 1
+                        gw.ps.stream(obtain(cw_odmr_seq), n_runs)
+                        gw.daq.sFor_Counter(int(dwell_time*1E12))
+                        gw.daq.wait_until_finished()  
+                        
+                        counter_data = gw.daq.get_counter_data()
+                        
                         # Record of photon counts
-                        signal_sweeps[-1][1][f] = sig
-                        background_sweeps[-1][1][f] = bg  
+                        signal_sweeps.append(counter_data[0][3])
+                        background_sweeps.append(counter_data[0][6])
                         # Notify the streamlist, and update it
                         signal_sweeps.updated_item(-1)
                         background_sweeps.updated_item(-1)
-
-
-                        # Data push 
-                        odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
-                                            'title': 'Optically Detected Magnetic Resonance',
-                                            'xlabel': 'Frequency (GHz)',
-                                            'ylabel': 'Counts',
-                                            'datasets': {'signal' : signal_sweeps,
-                                                        'background': background_sweeps}
-                                })
-
 
                         #
                         if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
@@ -956,7 +880,19 @@ class SpinMeasurements:
                             gw.laser.off()
                             print('the GUI has asked us nicely to exit')
                             return
-                    pbar.update(1)
+
+                    # avg_data = (avg_data*iter + np.array(signal_sweeps))/(iter+1)
+                    sig_a = (sig_a*iter + np.array(signal_sweeps))/(iter+1)
+                    bg_a = (bg_a*iter + np.array(background_sweeps))/(iter+1)
+
+                # Data push 
+                odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
+                                    'title': 'Optically Detected Magnetic Resonance',
+                                    'xlabel': 'Frequency (GHz)',
+                                    'ylabel': 'Counts',
+                                    'datasets': {'signal' : sig_a,
+                                                'background': bg_a}
+                        })
 
                 # We turn OFF the mw signal (modulation and amplitude)
                 gw.sg.set_rf_toggle(0)

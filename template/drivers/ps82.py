@@ -415,34 +415,37 @@ class PS82():
     """ def cw_seq_duration(self, seq_on):
         return seq_on.getDuration() """
 
-    def Pulsed_ODMR_R(self, pi_xy, iterations, probe_time, read_time):
-           # Seq. objects for on and off
-           """ seq_on = self.ps.createSequence()
-           seq_off = self.ps.createSequence() """
+    def Pulsed_ODMR_R(self, init_time, wait_time, pi_xy, probe_time, read_wait, read_time):
+        # Seq. objects for on and off
+        laser_lag = self.laser_lag
+        laser_init = int(init_time*1E9)
+        laser_mw_gap = int(wait_time*1E9)
+        mw_dur = int(probe_time*1E9)
+        mw_read_gap = int(read_wait*1E9)
 
-           if pi_xy == 'x':
-               self.IQ_ON = self.IQpx
-           elif pi_xy == 'y':
-               self.IQ_ON = self.IQpy
-           else:
-               raise ValueError("pi_xy must be 'x' or 'y'!")
+        if pi_xy == 'x':
+            self.IQ_ON = self.IQpx
+        elif pi_xy == 'y':
+            self.IQ_ON = self.IQpy
+        else:
+            raise ValueError("pi_xy must be 'x' or 'y'!")
 
-           init_laser_time = self.laser_time
-           laser_patt = [(init_laser_time, 1), (4000, 0), (init_laser_time, 1), (4000, 0)]
-           sync_patt = [(10, 1), (8000-10, 0)]
-           gate_patt = [(read_time, 1), (4000-read_time, 0), (read_time, 1), (4000-read_time, 0)]
-           mw_I_patt = [(init_laser_time, 0), (probe_time, self.IQ_ON[0]), (4000 - init_laser_time - probe_time, 0)]
-           mw_Q_patt = [(init_laser_time, 0), (probe_time, self.IQ_ON[1]), (4000 - init_laser_time - probe_time, 0)]
+        spcm_gate = [(laser_init + laser_mw_gap + mw_dur + mw_read_gap, 1)]
+        laser_patt = [(laser_init, 1), (laser_mw_gap + mw_dur + mw_read_gap, 0)]
+        mw_I_patt = [(laser_init + laser_mw_gap, self.IQ0[0]), (mw_dur, self.IQpx[0]), (mw_read_gap, self.IQ0[0])]
+        mw_Q_patt = [(laser_init + laser_mw_gap, self.IQ0[1]), (mw_dur, self.IQpx[1]), (mw_read_gap, self.IQ0[1])]
+        read_patt = [(laser_lag, 0), (read_time, 1), (laser_init - 2*read_time - laser_lag, 0), (read_time, 1), (laser_mw_gap + mw_dur + mw_read_gap, 0)]
+        #sync_patt = [(10, 1)]
 
-           pul_seq = self.ps.createSequence()
-           pul_seq.setDigital(self.channel_r['laser'], laser_patt*iterations)
-           pul_seq.setDigital(self.channel_r['sync'], sync_patt*iterations)
-           pul_seq.setDigital(self.channel_r['vrt_gate'], gate_patt*iterations)
-           pul_seq.setAnalog(0, mw_I_patt*iterations)
-           pul_seq.setAnalog(1, mw_Q_patt*iterations)
+        p_odmr_seq1 = self.ps.createSequence()
+        p_odmr_seq1.setDigital(self.channel_r["spcm_gate"], spcm_gate)
+        p_odmr_seq1.setDigital(self.channel_r["laser"], laser_patt)
+        p_odmr_seq1.setDigital(self.channel_r["vrt_gate"], read_patt)
+        #p_odmr_seq1.setDigital(ps_sync_ch, sync_patt)
+        p_odmr_seq1.setAnalog(0, mw_I_patt)
+        p_odmr_seq1.setAnalog(1, mw_Q_patt)
 
-           return pul_seq
-    
+        return p_odmr_seq1
 
 
     def Rabi(self, params, pi_xy, init_time, read_time, wait_time, read_wait, seq_gap):
