@@ -59,6 +59,11 @@ class PS82():
         # print('type(seq) is:', type(seq)
         # print('seq is:', seq
         # For cw_odmr_r
+        # final = OutputState.ZERO()
+        self.ps.stream(seq, n_runs)
+
+    def stream_final(self, seq, n_runs):
+        seq = obtain(seq)
         final = OutputState.ZERO()
         self.ps.stream(seq, n_runs, final)
 

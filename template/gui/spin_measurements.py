@@ -863,8 +863,18 @@ class SpinMeasurements:
                         background_sweeps.append(counter_data[0][6])
 
                     elif kwargs['odmr_type'] == 'Pulsed':
-                        gw.daq.
-
+                        runs = 3000
+                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, runs*2)
+                        gw.daq.CBM_start()
+                        gw.daq.sync()
+                        gw.ps.stream(pul_odmr_seq, runs)
+                        ready = False
+                        while ready is False:
+                            ready = gw.daq.cbm_ready()
+                            counts = gw.daq.count_BM()
+                        # Record of photon counts
+                        signal_sweeps.append(sum(counts[0::2]))
+                        background_sweeps.append(sum(counts[1::2]))
                     # Notify the streamlist, and update it
                     signal_sweeps.updated_item(-1)
                     background_sweeps.updated_item(-1)
@@ -897,10 +907,10 @@ class SpinMeasurements:
                         })
 
                 # We turn OFF the mw signal (modulation and amplitude)
-                gw.sg.set_rf_toggle(0)
-                print(8)
                 gw.sg.set_mod_toggle(0)
                 print(9)
+                gw.sg.set_rf_toggle(0)
+                print(8)
                 gw.laser.off()
                 #gw.ps.constant(OutputState([], 0.0, 0.0))
                 gw.ps.gate_off()
