@@ -559,7 +559,7 @@ class PS82():
         print('sequence time for 1 run is (ns):',seqs_total_time)
         return seqs
     
-    def Rabi_R(self, params, pi_xy, init_time, read_time, wait_time, read_wait): # Rolando A. Fimbres G. 9/22/2025
+    def Rabi_R(self, tau_times, pi_xy, init_time, read_time, wait_time, read_wait): # Rolando A. Fimbres G. 9/22/2025
         '''
         Rabi sequence
         init_time: laser duration for initialize the qubit
@@ -568,12 +568,15 @@ class PS82():
         read_wait: waiting duration before the readout laser
         seq_gap: waiting time after each sequence is done, for reinitialization. If needed
         '''
+        mw_to_end = 350
         ## Run a MW pulse of varying duration, then measure the signal
         ## and reference counts from NV.
         # self.total_time = 0
-        longest_time = self.convert_type(round(max(params)), float)
-        self.laser_time = init_time
-        self.readout_time = read_time
+        tau = tau_times
+        laser_lag = self.laser_lag
+        laser_init = int(init_time*1E9)
+        laser_mw_gap = int(wait_time*1E9)
+        mw_read_gap = int(read_wait*1E9)
         ## we can measure the pi time on x and on y.
         ## they should be the same, but they technically
         ## have different offsets on our pulse streamer.
@@ -584,70 +587,32 @@ class PS82():
         else:
             raise ValueError("pi_xy must be 'x' or 'y'!")
 
-        def SingleRabi_R(iq_on):
-            '''
-            CREATE SINGLE RABI SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
-            '''
+        def SingleRabi_R(mw_dur, mw_read_gap):
+           
+            spcm_gate = [(2*(laser_init + laser_mw_gap + mw_dur + mw_read_gap), 1)]
+            laser_patt = [(laser_init, 1), (laser_mw_gap + mw_dur + mw_read_gap, 0), (laser_init, 1), (laser_mw_gap + mw_dur + mw_read_gap, 0)]
+            mw_I_patt = [(laser_init + laser_mw_gap, self.IQ0[0]), (mw_dur, self.IQpx[0]), (mw_read_gap + laser_init + laser_mw_gap + mw_dur + mw_read_gap, self.IQ0[0])]
+            mw_Q_patt = [(laser_init + laser_mw_gap, self.IQ0[1]), (mw_dur, self.IQpx[1]), (mw_read_gap + laser_init + laser_mw_gap + mw_dur + mw_read_gap, self.IQ0[1])]
+            read_patt = [(laser_lag, 0), (read_time, 1), (laser_init - read_time + laser_mw_gap + mw_dur + mw_read_gap - laser_lag, 0), (read_time, 1), (laser_init + laser_mw_gap + mw_dur + mw_read_gap - read_time, 0)]
 
-            iq_on = float(round(iq_on)) # convert to proper data type to avoid undesired rpyc netref data type
+            single_rabi = self.ps.createSequence()
+            single_rabi.setDigital(self.channel_r["spcm_gate"], spcm_gate)
+            single_rabi.setDigital(self.channel_r["laser"], laser_patt)
+            single_rabi.setDigital(self.channel_r["vrt_gate"], read_patt)
+            single_rabi.setAnalog(0, mw_I_patt)
+            single_rabi.setAnalog(1, mw_Q_patt)
 
-            '''
-            DEFINE SPECIAL TIME INTERVALS FOR EXPERIMENT
-            '''
-            # padding time to equalize duration of every run (for different vsg_on durations)
+            return single_rabi
 
-            pad_time = longest_time - iq_on
+        full_rabi_seq = self.ps.createSequence()
+        
+        for t in tau:
+            mw_dur = int(t)
+            mw_read_gap = int(mw_to_end - mw_dur)
+            rabi_seq = SingleRabi_R(mw_dur, mw_read_gap)
+            full_rabi_seq += rabi_seq
 
-            '''
-            DEFINE RELEVANT ON, OFF TIMES FOR DEVICES
-            '''
-            init_laser_time = self.laser_time
-            laser_off = wait_time + iq_on + read_wait # + self.MW_buffer_time taken out, also in our scheme there's only one laser_off time by Rolando 9/22/2025
-            self.total_time = init_laser_time + laser_off # + self.readout_time + laser_off2
-
-            # mw I & Q off windows
-            iq_off = self.laser_time + wait_time # iq_off2 would be basically read_wait 
-            # tau_gap = iq_on + read_wait
-            # Read-Gate pattern trigger windows
-            read_off1 = self.laser_lag # + self.laser_time + laser_off1
-            read_off2 = self.laser_time - self.laser_lag - 2*read_time
-            read_off3 = laser_off #2 - self.laser_lag
-                
-            '''
-            CONSTRUCT PULSE SEQUENCE
-            '''
-            # create sequence objects for MW on and off blocks
-            single_rabi_seq = self.ps.createSequence()
-
-            # We define the pattern for the SPCM gate to be opened
-            spcm_seq = [(init_laser_time + laser_off, 1)]
-
-            # define sequence structure for laser
-            laser_seq = [(init_laser_time, 1), (laser_off, 0)]
-            
-            # define sequence structure for Read-Gate pattern
-            read_gate_seq = [(read_off1, 0), (read_time, 1), (read_off2, 0), (read_time, 1), (read_off3, 0)]
-            
-            # define sequence structure for MW I and Q when MW = ON
-            mw_I_seq = [(iq_off, self.IQ0[0]), (iq_on, self.IQ_ON[0]), (read_wait, self.IQ0[0])]
-            mw_Q_seq = [(iq_off, self.IQ0[1]), (iq_on, self.IQ_ON[1]), (read_wait, self.IQ0[1])]
-
-            single_rabi_seq.setDigital(self.channel_r["spcm_gate"], spcm_seq) # DAQ clock -- record data
-            single_rabi_seq.setDigital(self.channel_r["laser"], laser_seq) # laser 
-            single_rabi_seq.setDigital(self.channel_r["vrt_gate"], read_gate_seq) # integrator trigger
-            single_rabi_seq.setAnalog(0, mw_I_seq) # mw_I
-            single_rabi_seq.setAnalog(1, mw_Q_seq) # mw_Q
-
-            return single_rabi_seq
-
-        full_seqs = self.ps.createSequence()
-        seqs_total_time = 0
-        for mw_time in params:
-            full_seqs += SingleRabi_R(mw_time)
-            seqs_total_time += self.total_time
-        print('Rabi sequence created!')
-        print("Sequence time for 1 run is ns:", seqs_total_time)
-        return obtain(full_seqs)
+        return full_rabi_seq
 
     def ps_reset(self):
         self.ps.reset()

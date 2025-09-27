@@ -850,17 +850,17 @@ class SpinMeasurements:
                     gw.sg.set_frequency(freq)
 
                     if kwargs['odmr_type'] == 'CW':
-                        gw.daq.start_counter([tt_spcm_ch], bin_width*1E3, n_bins)
+                        gw.daq.start_counter([tt_spcm_ch], int(bin_width*1E3), n_bins)
                         n_runs = 1
                         gw.ps.stream(obtain(cw_odmr_seq), n_runs)
                         gw.daq.sFor_Counter(int(dwell_time*1E12))
-                        gw.daq.wait_until_finished()  
+                        gw.daq.wait_until_counter()  
                         
                         counter_data = gw.daq.get_counter_data()
                         
                         # Record of photon counts
-                        signal_sweeps.append(counter_data[0][3])
-                        background_sweeps.append(counter_data[0][6])
+                        sig.append(counter_data[0][3])
+                        bg.append(counter_data[0][6])
 
                     elif kwargs['odmr_type'] == 'Pulsed':
                         runs = 3000
@@ -873,11 +873,19 @@ class SpinMeasurements:
                             ready = gw.daq.cbm_ready()
                             counts = gw.daq.count_BM()
                         # Record of photon counts
-                        signal_sweeps.append(sum(counts[0::2]))
-                        background_sweeps.append(sum(counts[1::2]))
-                    # Notify the streamlist, and update it
-                    signal_sweeps.updated_item(-1)
-                    background_sweeps.updated_item(-1)
+                        sig.append(sum(counts[0::2]))
+                        bg.append(sum(counts[1::2]))
+                
+                # avg_data = (avg_data*iter + np.array(signal_sweeps))/(iter+1)
+                sig_a = (sig_a*iter + np.array([float(x) for x in sig]))/(iter+1)
+                bg_a = (bg_a*iter + np.array([float(x) for x in bg]))/(iter+1)
+
+                signal_sweeps.append(sig_a)
+                background_sweeps.append(bg_a)
+
+                # Notify the streamlist, and update it
+                signal_sweeps.updated_item(-1)
+                background_sweeps.updated_item(-1)
 
                 if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
                     #gw.daq.free_time_tagger()
@@ -893,9 +901,6 @@ class SpinMeasurements:
                     print('the GUI has asked us nicely to exit')
                     return
 
-                # avg_data = (avg_data*iter + np.array(signal_sweeps))/(iter+1)
-                sig_a = (sig_a*iter + np.array(signal_sweeps))/(iter+1)
-                bg_a = (bg_a*iter + np.array(background_sweeps))/(iter+1)
 
                 # Data push 
                 odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
@@ -906,16 +911,16 @@ class SpinMeasurements:
                                                 'background': bg_a}
                         })
 
-                # We turn OFF the mw signal (modulation and amplitude)
-                gw.sg.set_mod_toggle(0)
-                print(9)
-                gw.sg.set_rf_toggle(0)
-                print(8)
-                gw.laser.off()
-                #gw.ps.constant(OutputState([], 0.0, 0.0))
-                gw.ps.gate_off()
-                gw.ps.ps_reset()
-                gw.daq.free_time_tagger()
+        # We turn OFF the mw signal (modulation and amplitude)
+        gw.sg.set_mod_toggle(0)
+        print(9)
+        gw.sg.set_rf_toggle(0)
+        print(8)
+        gw.laser.off()
+        #gw.ps.constant(OutputState([], 0.0, 0.0))
+        gw.ps.gate_off()
+        gw.ps.ps_reset()
+        gw.daq.free_time_tagger()
 
 
     #ODMR_2Dsweeping
@@ -1582,6 +1587,8 @@ class SpinMeasurements:
         '''
         with InstrumentGateway() as gw, DataSource("Rabi") as rabi_data:
             
+            np.set_printoptions(precision=6)
+
             # pi pulse durations that will be swept over in the Rabi measurement (converted to ns)
             mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
             #num_mw = len(mw_times)
@@ -1589,27 +1596,27 @@ class SpinMeasurements:
             signal_sweeps = StreamingList()
             background_sweeps = StreamingList()
 
-            # pulse streamer sequence
-            if kwargs['rabi_type'] == "SRS":
-                print("USING SRS FOR RABI MEASUREMENT.")
-                ps_seq = gw.ps.Rabi(mw_times, kwargs['xy'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9, kwargs['seq_gap']*1e9)
-                # Setup the MW
-                gw.sg.set_frequency(kwargs['freq'])
-                gw.sg.set_rf_amplitude(kwargs['rf_power'])
-                gw.sg.set_mod_type(6)
-                gw.sg.set_rf_toggle(1)
-                gw.sg.set_mod_toggle(1)
-                gw.sg.set_qmod_function(5)
-            else:
-                raise ValueError("Rabi Type must be SRS!")
-            
+                        
             # set initial parameters for instrument server devices
             # Turn on the laser
             gw.laser.cw_mode()
             gw.laser.get_power()
             gw.laser.set_power(10) # set laser power to 10% 
             gw.laser.on()
-            
+
+            # pulse streamer sequence
+            if kwargs['rabi_type'] == "SRS":
+                print("USING SRS FOR RABI MEASUREMENT.")
+                ps_seq = gw.ps.Rabi_R(mw_times, kwargs['xy'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9, kwargs['seq_gap']*1e9)
+                # Setup the MW
+                gw.sg.set_frequency(kwargs['freq'])
+                gw.sg.set_rf_amplitude(kwargs['rf_power'])
+                gw.sg.set_mod_type(6)
+                gw.sg.set_qmod_function(5)
+                gw.sg.set_mod_toggle(1)
+                gw.sg.set_rf_toggle(1)
+            else:
+                raise ValueError("Rabi Type must be SRS!")
 
             """ Time Tagger Channel, Trigger Level and Counting Event Setup """
             tt_gate_ch = 1
@@ -1620,73 +1627,71 @@ class SpinMeasurements:
             gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
             gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
 
-            runs = kwargs['runs']
+            runs = 20000
 
-            with tqdm(total = kwargs['iters']) as pbar:
+            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, 2*len(mw_times)*runs)
+            gw.daq.CBM_start()
+            gw.daq.sync()
 
-                for iter in range(kwargs['iters']):
+            gw.ps.stream(obtain(ps_seq), runs)
+            ready = False
 
-                    gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, CHANNEL_UNUSED, 2*len(mw_times)*runs)
-                    gw.daq.CBM_start()
-                    gw.daq.sync()
+            while ready is False:
+                ready = gw.daq.cbm_ready()
+                counts = gw.daq.count_BM()
+                
+            i = 0
+            sig = np.zeros(len(mw_times))
+            bg = np.zeros(len(mw_times))
+            length_unit = len(mw_times)*2 # Length of data values in one full sequence (signal + background)
+            while i < len(counts):
+                unit_data = counts[i:i+length_unit] # Used to separate data for a single full sequence
+                sig += unit_data[1::2]
+                bg += unit_data[::2]
+                i += length_unit
 
-                    gw.ps.stream(obtain(ps_seq), runs)
-                    ready = False
+            sig = sig/runs
+            bg = bg/runs
 
-                    while ready is False:
-                        time.sleep(.2)
-                        ready = gw.daq.cbm_ready()
-                        rabi_result = gw.daq.count_BM()
+            signal_sweeps.append(sig)
+            background_sweeps.append(bg)
+            # notify the streaminglist that this entry has updated so it will be pushed to the data server
+            signal_sweeps.updated_item(-1)
+            background_sweeps.updated_item(-1)
 
-                    rabi_result = obtain(rabi_result)
-                    # partition buffer into signal and background datasets
-                    print("Rabi result sample:", rabi_result[:10])
-                    sig_array, bg_array = self.digital_math(rabi_result, 'Rabi', kwargs['num_pts'])
-                    
-                    
-                    # correct the y-axis data ordering for plots
-                    # sig_array = np.array([sig_array[i] for i in index_order])
-                    # bg_array = np.array([bg_array[i] for i in index_order])
-                    #print('mw_times_ordered is: \n',mw_times_ordered)
-                    signal_sweeps.append(np.stack([mw_times, sig_array]))
-                    background_sweeps.append(np.stack([mw_times, bg_array]))
-                    # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                    signal_sweeps.updated_item(-1)
-                    background_sweeps.updated_item(-1)
+                
+            rabi_data.push({'params': {'mw_num': kwargs['num_pts'], 'iter_num': kwargs['iters'],'runs_num': kwargs['runs']},
+                            'title': 'Rabi',
+                            'xlabel': 'MW Time (ns)',
+                            'ylabel': 'Counts',
+                            'datasets': {'signal' : signal_sweeps,
+                                        'background': background_sweeps}
+            })
+            if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                # gw.daq.free_time_tagger()
+                gw.sg.set_rf_toggle(0)
+                gw.sg.set_mod_toggle(0)
+                gw.ps.ps_reset()
+                gw.laser.get_power()
+                gw.laser.off()
+                gw.laser.set_power(0)
+                # if kwargs['rabi_type'] == "SRS":
+                #else:
+                # gw.windfreak.ch0_off()
+                print('the GUI has asked us nicely to exit')
+                return
 
-                    
-                    rabi_data.push({'params': {'mw_num': kwargs['num_pts'], 'iter_num': kwargs['iters'],'runs_num': kwargs['runs']},
-                                    'title': 'Rabi',
-                                    'xlabel': 'MW Time (ns)',
-                                    'ylabel': 'Counts',
-                                    'datasets': {'signal' : signal_sweeps,
-                                                'background': background_sweeps}
-                    })
-                    if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                        # gw.daq.free_time_tagger()
-                        gw.sg.set_rf_toggle(0)
-                        gw.sg.set_mod_toggle(0)
-                        gw.ps.ps_reset()
-                        gw.laser.get_power()
-                        gw.laser.off()
-                        gw.laser.set_power(0)
-                        # if kwargs['rabi_type'] == "SRS":
-                        #else:
-                        # gw.windfreak.ch0_off()
-                        print('the GUI has asked us nicely to exit')
-                        return
+                
 
-                    pbar.update(1)
-
-            # We turn OFF the mw signal (modulation and amplitude)        
-            gw.sg.set_rf_toggle(0)
-            gw.sg.set_mod_toggle(0)
-            gw.laser.off()
-            gw.laser.get_power()
-            gw.laser.set_power(0)
-            gw.ps.ps_reset()
-            gw.daq.free_time_tagger()
-            # if kwargs['rabi_type'] == "SRS":
+        # We turn OFF the mw signal (modulation and amplitude)        
+        gw.sg.set_rf_toggle(0)
+        gw.sg.set_mod_toggle(0)
+        gw.laser.off()
+        gw.laser.get_power()
+        gw.laser.set_power(0)
+        gw.ps.ps_reset()
+        gw.daq.free_time_tagger()
+        # if kwargs['rabi_type'] == "SRS":
             
             
     
