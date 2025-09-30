@@ -27,16 +27,7 @@ class RabiWidget(ExperimentWidget):
             'runs': {
                 'display_text': 'Runs (per pt.): ',
                 'widget': SpinBox(
-                    value = 200,
-                    int = True,
-                    bounds=(1, None),
-                ),
-            },
-
-            'iters': {
-                'display_text': 'Exp. Iterations: ',
-                'widget': SpinBox(
-                    value = 10,
+                    value = 2000,
                     int = True,
                     bounds=(1, None),
                 ),
@@ -56,7 +47,7 @@ class RabiWidget(ExperimentWidget):
             'rf_power': {
                 'display_text': 'RF Power: ',
                 'widget': SpinBox(
-                    value = -18,
+                    value = -15,
                     suffix = 'dBm',
                     siPrefix = False,
                     bounds = (None, -15),
@@ -76,7 +67,7 @@ class RabiWidget(ExperimentWidget):
             'stop': {
                 'display_text': 'Stop MW Pulse Time: ',
                 'widget': SpinBox(
-                    value = 500e-9,
+                    value = 300e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
@@ -94,10 +85,20 @@ class RabiWidget(ExperimentWidget):
                 ),
             },
 
+            'laser_power': {
+                'display_text': 'Laser Power [%]',
+                'widget': SpinBox(
+                    value = 5,
+                    int = True,
+                    bounds = (0, 100),
+                    dec = True,
+                ),
+            },
+
             'init_time': {
                 'display_text': 'Init. Time: ',
                 'widget': SpinBox(
-                    value = 8e-6,
+                    value = 5e-6,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (5e-7, None),
@@ -117,7 +118,7 @@ class RabiWidget(ExperimentWidget):
             'wait_time': {
                 'display_text': 'Init Wait (singlet decay): ',
                 'widget': SpinBox(
-                    value = 600e-9,
+                    value = 300e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
@@ -127,7 +128,7 @@ class RabiWidget(ExperimentWidget):
             'read_wait': {
                 'display_text': 'Read Wait: ',
                 'widget': SpinBox(
-                    value = 100e-9,
+                    value = 350e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
@@ -154,7 +155,7 @@ class RabiWidget(ExperimentWidget):
                 ),
             },
 
-            'xy': {
+            'pi_xy': {
                 'display_text': 'X or Y pulse?',
                 'widget': QtWidgets.QLineEdit("x"),
             },

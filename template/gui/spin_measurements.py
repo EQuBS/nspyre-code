@@ -797,28 +797,26 @@ class SpinMeasurements:
             background_sweeps = StreamingList()
 
             # We define parameters 
-            dwell_time = kwargs['dwell_time'] # in seconds
+            dwell_time = int(kwargs['dwell_time']*1e9) # in nanoseconds
             n_bins = 10
-            bin_width = dwell_time/n_bins # in ms
+            bin_width = int(dwell_time/n_bins) # in ms
 
             # Set laser
             gw.laser.cw_mode()
             gw.laser.get_power()
-            gw.laser.set_power(5) # Set laser power to 5%
+            gw.laser.set_power(kwargs['laser_power']) # Set laser power to 5%
             gw.laser.on()
 
-            # We set the appropriate Sig. Generator
-            if kwargs['odmr_sg'] == 'SRS':
-                # We create the Pulse Streamer seq.
-                if kwargs['odmr_type'] == 'CW':
-                    cw_odmr_seq = gw.ps.CW_ODMR_R(dwell_time*1e9, kwargs['runs'])
-                elif kwargs['odmr_type']=='Pulsed':
-                    pul_odmr_seq = gw.ps.Pulsed_ODMR_R(kwargs['iterations'], kwargs['probe_time']*1e9, kwargs['read_time']*1e9)
-                else:
-                    raise ValueError("Invalid ODMR type")
+            # We create the Pulse Streamer seq.
+            if kwargs['odmr_type'] == 'CW':
+                cw_odmr_seq = gw.ps.CW_ODMR_R(dwell_time, kwargs['runs'])
+            elif kwargs['odmr_type']=='Pulsed':
+                pul_odmr_seq = gw.ps.Pulsed_ODMR_R(kwargs['init_time']*1e9, kwargs['wait_time']*1e9, kwargs['pi_xy'], kwargs['probe_time']*1e9, kwargs['read_wait']*1e9, kwargs['read_time']*1e9)
+            else:
+                raise ValueError("Invalid ODMR type")
 
-                # We set parameters for our signal generator
-                gw.sg.set_rf_amplitude(kwargs['mw_power'])
+            # We set parameters for our signal generator
+            gw.sg.set_rf_amplitude(kwargs['mw_power'])
                 
 
             # We assign Trigger Levels, and counting event in the Time Tagger
@@ -850,10 +848,10 @@ class SpinMeasurements:
                     gw.sg.set_frequency(freq)
 
                     if kwargs['odmr_type'] == 'CW':
-                        gw.daq.start_counter([tt_spcm_ch], int(bin_width*1E3), n_bins)
+                        gw.daq.start_counter([tt_spcm_ch], bin_width*1E3, n_bins)
                         n_runs = 1
                         gw.ps.stream(obtain(cw_odmr_seq), n_runs)
-                        gw.daq.sFor_Counter(int(dwell_time*1E12))
+                        gw.daq.sFor_Counter(int(bin_width*1E3*n_bins))  
                         gw.daq.wait_until_counter()  
                         
                         counter_data = gw.daq.get_counter_data()
@@ -861,13 +859,17 @@ class SpinMeasurements:
                         # Record of photon counts
                         sig.append(counter_data[0][3])
                         bg.append(counter_data[0][6])
+                        # Count verification
+                        print("counter_data: ", counter_data)
+                        print("Signal counts: ", counter_data[0][3])
+                        print("Background counts: ", counter_data[0][6])
 
                     elif kwargs['odmr_type'] == 'Pulsed':
                         runs = 3000
                         gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, runs*2)
                         gw.daq.CBM_start()
                         gw.daq.sync()
-                        gw.ps.stream(pul_odmr_seq, runs)
+                        gw.ps.stream(obtain(pul_odmr_seq), runs)
                         ready = False
                         while ready is False:
                             ready = gw.daq.cbm_ready()
@@ -880,8 +882,12 @@ class SpinMeasurements:
                 sig_a = (sig_a*iter + np.array([float(x) for x in sig]))/(iter+1)
                 bg_a = (bg_a*iter + np.array([float(x) for x in bg]))/(iter+1)
 
-                signal_sweeps.append(sig_a)
-                background_sweeps.append(bg_a)
+                signal_sweeps.append(np.stack([frequencies/1e9, sig_a]))
+                background_sweeps.append(np.stack([frequencies/1e9, bg_a]))
+
+                # To use... RAFG 9/29/2025
+                # signal_sweeps.append(np.stack([frequencies/1e9, sig_a]))
+                # background_sweeps.append(np.stack([frequencies/1e9, bg_a]))
 
                 # Notify the streamlist, and update it
                 signal_sweeps.updated_item(-1)
@@ -907,8 +913,9 @@ class SpinMeasurements:
                                     'title': 'Optically Detected Magnetic Resonance',
                                     'xlabel': 'Frequency (GHz)',
                                     'ylabel': 'Counts',
-                                    'datasets': {'signal' : sig_a,
-                                                'background': bg_a}
+                                    'datasets': {'signal' : signal_sweeps,
+                                                'background': background_sweeps,
+                                                } #'frequencies': frequencies
                         })
 
         # We turn OFF the mw signal (modulation and amplitude)
@@ -1590,7 +1597,7 @@ class SpinMeasurements:
             np.set_printoptions(precision=6)
 
             # pi pulse durations that will be swept over in the Rabi measurement (converted to ns)
-            mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
+            mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])
             #num_mw = len(mw_times)
 
             signal_sweeps = StreamingList()
@@ -1601,13 +1608,13 @@ class SpinMeasurements:
             # Turn on the laser
             gw.laser.cw_mode()
             gw.laser.get_power()
-            gw.laser.set_power(10) # set laser power to 10% 
+            gw.laser.set_power(kwargs['laser_power']) # set laser power to 10%
             gw.laser.on()
 
             # pulse streamer sequence
             if kwargs['rabi_type'] == "SRS":
                 print("USING SRS FOR RABI MEASUREMENT.")
-                ps_seq = gw.ps.Rabi_R(mw_times, kwargs['xy'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9, kwargs['seq_gap']*1e9)
+                ps_seq = gw.ps.Rabi_R(mw_times*1e9, kwargs['pi_xy'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9)
                 # Setup the MW
                 gw.sg.set_frequency(kwargs['freq'])
                 gw.sg.set_rf_amplitude(kwargs['rf_power'])
@@ -1627,15 +1634,13 @@ class SpinMeasurements:
             gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
             gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
 
-            runs = 20000
+            runs = kwargs['runs']
 
             gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, 2*len(mw_times)*runs)
             gw.daq.CBM_start()
             gw.daq.sync()
-
             gw.ps.stream(obtain(ps_seq), runs)
             ready = False
-
             while ready is False:
                 ready = gw.daq.cbm_ready()
                 counts = gw.daq.count_BM()
@@ -1653,8 +1658,8 @@ class SpinMeasurements:
             sig = sig/runs
             bg = bg/runs
 
-            signal_sweeps.append(sig)
-            background_sweeps.append(bg)
+            signal_sweeps.append(np.stack([mw_times, sig]))
+            background_sweeps.append(np.stack([mw_times, bg]))
             # notify the streaminglist that this entry has updated so it will be pushed to the data server
             signal_sweeps.updated_item(-1)
             background_sweeps.updated_item(-1)

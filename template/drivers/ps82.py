@@ -423,10 +423,10 @@ class PS82():
     def Pulsed_ODMR_R(self, init_time, wait_time, pi_xy, probe_time, read_wait, read_time):
         # Seq. objects for on and off
         laser_lag = self.laser_lag
-        laser_init = int(init_time*1E9)
-        laser_mw_gap = int(wait_time*1E9)
-        mw_dur = int(probe_time*1E9)
-        mw_read_gap = int(read_wait*1E9)
+        laser_init = int(init_time)
+        laser_mw_gap = int(wait_time)
+        mw_dur = int(probe_time)
+        mw_read_gap = int(read_wait)
 
         if pi_xy == 'x':
             self.IQ_ON = self.IQpx

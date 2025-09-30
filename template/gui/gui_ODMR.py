@@ -29,7 +29,7 @@ class ODMR_Widget(ExperimentWidget):
             'start_freq': {
                 'display_text': 'Start Frequency',
                 'widget': SpinBox(
-                    value = 2e9,
+                    value = 2.4e9,
                     suffix = 'Hz',
                     siPrefix = True,
                     bounds = (100e3, 7e9),
@@ -39,7 +39,7 @@ class ODMR_Widget(ExperimentWidget):
             'stop_freq': {
                 'display_text': 'Stop Frequency',
                 'widget': SpinBox(
-                    value = 3e9,
+                    value = 3.2e9,
                     suffix = 'Hz',
                     siPrefix = True,
                     bounds = (100e3, 7e9),
@@ -49,7 +49,7 @@ class ODMR_Widget(ExperimentWidget):
             'num_points': {
                 'display_text': 'Number of Points',
                 'widget': SpinBox(
-                    value = 100,
+                    value = 40,
                     int = True,
                     bounds = (1, None),
                     dec=True,
@@ -104,37 +104,28 @@ class ODMR_Widget(ExperimentWidget):
                 'display_text': 'ODMR Type',
                 'widget': QtWidgets.QLineEdit("CW"),
             },
+            'laser_power': {
+                'display_text': 'Laser Power [%]',
+                'widget': SpinBox(
+                    value = 5,
+                    int = True,
+                    bounds = (0, 100),
+                    dec = True,
+                ),
+            },
             'init_time': {
                 'display_text': 'Init. Time: ',
                 'widget': SpinBox(
-                    value = 2e-6,
+                    value = 5e-6,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (5e-9, None),
                 ),
             },
-            'sweep_rate':{
-                'display_text': 'Sweep Rate: ',
-                'widget': SpinBox(
-                    value = 1,
-                    suffix = 'Hz',
-                    siPrefix = True,
-                    bounds = (1e-6, 120),
-                ),
-            },
-            'sweep_dev': {
-                'display_text': 'Sweep Deviation: ',
-                'widget': SpinBox(
-                    value = 100e6,
-                    suffix = 'Hz',
-                    siPrefix = True,
-                    bounds = (1, 575e6),
-                ),
-            },
             'read_time': {
                 'display_text': 'Readout Time: ',
                 'widget': SpinBox(
-                    value = 400e-9,
+                    value = 600e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (10e-9, None),
@@ -152,13 +143,13 @@ class ODMR_Widget(ExperimentWidget):
             'read_wait': {
                 'display_text': 'Read Wait: ',
                 'widget': SpinBox(
-                    value = 10e-9,
+                    value = 350e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
                 ),
             },
-            'xy': {
+            'pi_xy': {
                 'display_text': 'X or Y pulse?',
                 'widget': QtWidgets.QLineEdit("x"),
             },
@@ -170,19 +161,6 @@ class ODMR_Widget(ExperimentWidget):
                     siPrefix = True,
                     bounds = (0, None),
                 ),
-            },
-            'seq_gap': {
-                'display_text': 'seq_gap: ',
-                'widget': SpinBox(
-                    value = 0e-9,
-                    suffix = 's',
-                    siPrefix = True,
-                    bounds = (0, None),
-                ),
-            },
-            'odmr_sg': {
-                'display_text': 'Which SG?',
-                'widget': QtWidgets.QLineEdit("SRS"),
             },
             'dataset': {
                 'display_text': 'Data Set',
@@ -222,8 +200,13 @@ def process_ODMR_data(sink: DataSink):
         freqs = sink.datasets['signal'][s][0]
         sig = sink.datasets['signal'][s][1]
         bg = sink.datasets['background'][s][1]
-        diff_sweeps.append(np.stack([freqs, sig - bg]))
-        div_sweeps.append(np.stack([freqs, sig/bg]))
+
+        # Avoid division by zero or invalid values
+        # sig[sig == 0] = np.nan
+        bg[bg == 0] = np.nan
+
+        diff_sweeps.append(np.stack([freqs/1E9, sig - bg]))
+        div_sweeps.append(np.stack([freqs/1E9, sig/bg]))
         #divnow_sweeps.append(np.stack([freqs, np.mean(sink.datasets['signal'][:s][1],axis=0)/np.mean(sink.datasets['background'][:s][1],axis=0)]))
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['div'] = div_sweeps
