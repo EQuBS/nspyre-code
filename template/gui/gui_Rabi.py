@@ -43,6 +43,16 @@ class RabiWidget(ExperimentWidget):
                     dec = True,
                 ),
             },
+            
+            'iterations': {
+                'display_text': 'Num. of Iterations',
+                'widget': SpinBox(
+                    value = 1,
+                    int = True,
+                    bounds = (1, None),
+                    dec = True,
+                ),
+            },
 
             'rf_power': {
                 'display_text': 'RF Power: ',
@@ -182,7 +192,10 @@ def process_Rabi_data(sink: DataSink):
         sig = sink.datasets['signal'][s][1]
         bg = sink.datasets['background'][s][1]
         diff_sweeps.append(np.stack([mw_times, sig - bg]))
-        contrast_sweeps.append(np.stack([mw_times, (sig - bg)/(sig + bg)]))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            contrast = (sig - bg) / (sig + bg)
+            contrast = np.where(np.isfinite(contrast), contrast, 0)  # or use 0 instead of np.nan if preferred
+        contrast_sweeps.append(np.stack([mw_times, contrast]))
         #div_sweeps.append(np.stack([mw_times, sig/bg]))
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['contrast'] = contrast_sweeps
