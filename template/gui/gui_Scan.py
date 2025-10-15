@@ -812,63 +812,7 @@ class ScanWidget(QtWidgets.QWidget):
         corrected_input = np.clip(corrected_input, min_val, max_val)
         
         # STEP 4: Return the corrected waveform.
-        return corrected_input
-
-    # Function to print the average percentual error between the input_wfm and corrected_input.
-    def print_avg_percentage_error(self, corrected_input: np.ndarray, input_wfm: np.ndarray, label: str = ""):
-        """
-        Calculates and prints the average percentage error between a corrected waveform
-        and the desired target waveform.
-
-        Args:
-            corrected_input (np.ndarray): The waveform computed to compensate system distortion.
-            input_wfm (np.ndarray): The desired or theoretical waveform.
-            label (str): Optional string to label the output (e.g., "X-axis").
-        """
-        if len(corrected_input) != len(input_wfm):
-            raise ValueError("Waveforms must be the same length.")
-
-        abs_diff = np.abs(corrected_input - input_wfm)
-        with np.errstate(divide='ignore', invalid='ignore'):
-            percentage_error = np.where(input_wfm != 0, ((abs_diff / np.abs(input_wfm)) * 100), 0)
-
-        avg_error = np.mean(percentage_error)
-        max_error = np.max(percentage_error)
-
-        label_str = f"{label}: " if label else ""
-        print(f"{label_str}Average % Error: {avg_error:.5f}%  |  Max % Error: {max_error:.5f}%")
-
-    """ def visualize_scan_data(self):
-        """
-        #Visualize scan data using DataSink and FlexLinePlotWidget.
-        #This function pulls the latest scan data from the data server and displays it.
-    """
-        with DataSink('Scan_data') as sink:
-            data = sink.pull()
-            if not data or 'datasets' not in data:
-                QMessageBox.warning(self, "No Data", "No scan data available to visualize.")
-                return
-            x = np.array(data['datasets']['xSteps'])
-            y = np.array(data['datasets']['ySteps'])
-            counts = np.array(data['datasets']['ScanCounts'])
-            nx_pix = self.data_points_x.value()
-            ny_pix = self.data_points_y.value()
-            if counts.size != nx_pix * ny_pix:
-                QMessageBox.warning(self, "Data Error", "Scan data shape does not match scan parameters.")
-                return
-            img = np.reshape(counts, (nx_pix, ny_pix))
-            # Display using FlexLinePlotWidget as an image
-            plot_widget = FlexLinePlotWidget()
-            plot_widget.setWindowTitle('Scan Counts Visualization')
-            plot_widget.imshow(
-                img,
-                x=np.linspace(self.x_min_box.value(), self.x_max_box.value(), nx_pix),
-                y=np.linspace(self.y_min_box.value(), self.y_max_box.value(), ny_pix),
-                xlabel='X (um)', ylabel='Y (um)', title='Scan Counts'
-            )
-            plot_widget.show()
-
-        layout_row += 1 """        
+        return corrected_input  
     
     def export_data(self):
         sink = DataSink('XZ Scan')
