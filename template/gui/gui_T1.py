@@ -150,7 +150,7 @@ class T1Widget(ExperimentWidget):
                 ),
             },
             
-            'seq_gap': {
+            'las_to_pulse': {
                 'display_text': 'Seq. Gap: ',
                 'widget': SpinBox(
                     value=0,

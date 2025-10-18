@@ -2755,6 +2755,47 @@ class SpinMeasurements:
                 gw.ps.Pulser.reset()
                 gw.laser.off()
     
+    def T1_run_R(self, **kwargs):
+        with InstrumentGateway() as gw, DataSource('T1_R') as t1r_data:
+            np.set_printoptions(precision=6)
+            tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])
+            signal_sweeps = StreamingList()
+            background_sweeps = StreamingList()
+            # set initial parameters for instrument server devices
+            # Turn on the laser
+            gw.ps.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['laser_power']) # set laser power to 10%
+            gw.laser.on()
+
+            # pulse streamer sequence
+            print("USING SRS FOR RABI MEASUREMENT.")
+            #ps_seq = gw.ps.Rabi_R(mw_times*1e9, kwargs['pi_xy'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9)
+
+            """ Time Tagger Channel, Trigger Level and Counting Event Setup """
+            tt_gate_ch = 1
+            tt_sync_ch = 2
+            tt_spcm_ch = 3
+
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)   # Gate channel trigger level
+            gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
+
+            # Setup the MW
+            gw.sg.set_frequency(kwargs['freq'])
+            gw.sg.set_rf_amplitude(kwargs['rf_power'])
+            gw.sg.set_mod_type(6)
+            gw.sg.set_qmod_function(5)
+            gw.sg.set_mod_toggle(1)
+            gw.sg.set_rf_toggle(1)
+
+            runs = 20 # set as a test
+
+            #gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, 2*len(mw_times)*runs) 
+            gw.daq.CBM_start()
+            gw.daq.sync()
+            #gw.ps.stream(obtain(ps_seq), runs)  
+
     def T2_run(self, **kwargs):
         '''
         Developed by Tian-Xing in Sept.2023

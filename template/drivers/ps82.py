@@ -590,7 +590,7 @@ class PS82():
 
         def SingleRabi_R(mw_dur, mw_read_gap):
            
-            spcm_gate = [(int(2*laser_init + 2*laser_mw_gap + 2*mw_dur + 2*mw_read_gap), 1)]
+            spcm_gate = [(int(2*laser_init + 2*laser_mw_gap + 2*mw_dur + 2*mw_read_gap)    , 1)]
             laser_patt = [(laser_init, 1), (laser_mw_gap + mw_dur + mw_read_gap, 0), (laser_init, 1), (laser_mw_gap + mw_dur + mw_read_gap, 0)]
             mw_I_patt = [(laser_init + laser_mw_gap, self.IQ0[0]), (mw_dur, self.IQpx[0]), (mw_read_gap + laser_init + laser_mw_gap + mw_dur + mw_read_gap, self.IQ0[0])]
             mw_Q_patt = [(laser_init + laser_mw_gap, self.IQ0[1]), (mw_dur, self.IQpx[1]), (mw_read_gap + laser_init + laser_mw_gap + mw_dur + mw_read_gap, self.IQ0[1])]
@@ -660,6 +660,54 @@ class PS82():
 
         return single_rabi
 
+    def T1_R(self, pi_dur, tau_times, pi_xy, init_time, read_time, wait_time):
+        '''
+        T1 sequence
+        init_time: laser duration for initialize the qubit
+        read_time: laser duration for readout the qubit
+        wait_time: waiting duration after the initialization laser
+        read_wait: waiting duration before the readout laser
+        seq_gap: waiting time after each sequence is done, for reinitialization. If needed
+        '''
+        ## Run a MW pulse of varying duration, then measure the signal
+        laser_lag = self.laser_lag
+        laser_init = int(init_time)
+        laser_mw_gap = int(wait_time)
+        mw_dur = int(pi_dur)
+
+        if pi_xy == 'x':
+            self.IQ_ON = self.IQpx
+        elif pi_xy == 'y':
+            self.IQ_ON = self.IQpy
+        else:
+            raise ValueError("pi_xy must be 'x' or 'y'!")
+
+        def Single_T1(tau_times):
+           
+            spcm_gate = [(int(2*laser_init + 2*laser_mw_gap + 2*mw_dur + 2*tau_times)    , 1)]
+            laser_patt = [(laser_init, 1), (laser_mw_gap + mw_dur + tau_times, 0), (laser_init, 1), (laser_mw_gap + mw_dur + tau_times, 0)]
+            mw_I_patt = [(laser_init + laser_mw_gap, self.IQ0[0]), (mw_dur, self.IQpx[0]), (tau_times + laser_init + laser_mw_gap + mw_dur + tau_times, self.IQ0[0])]
+            mw_Q_patt = [(laser_init + laser_mw_gap, self.IQ0[1]), (mw_dur, self.IQpx[1]), (tau_times + laser_init + laser_mw_gap + mw_dur + tau_times, self.IQ0[1])]
+            read_patt = [(laser_lag, 0), (read_time, 1), (laser_init - read_time + laser_mw_gap + mw_dur + tau_times, 0), (read_time, 1), (laser_init - read_time + laser_mw_gap + mw_dur + tau_times, 0)]
+
+            single_T1 = self.ps.createSequence()
+            single_T1.setDigital(self.channel_r["spcm_gate"], spcm_gate)
+            single_T1.setDigital(self.channel_r["laser"], laser_patt)
+            single_T1.setDigital(self.channel_r["vrt_gate"], read_patt)
+            single_T1.setAnalog(0, mw_I_patt)
+            single_T1.setAnalog(1, mw_Q_patt)
+
+            return single_T1
+
+        full_T1_seq = self.ps.createSequence()
+
+        for t in tau_times:
+            tau = int(t)
+            mw_read_gap = int(tau)
+            T1_seq = Single_T1(mw_read_gap)
+            full_T1_seq += T1_seq
+
+        return full_T1_seq
 
     def ps_reset(self):
         self.ps.reset()
