@@ -46,7 +46,7 @@ class MCL_Nanodrive:
         self.error_list = [-1, -2, -3, -4, -5, -6, -7, -8]
 
         # Initialize handle for this instance
-        # self.handle = self.init_handle() # Added by Rolando 7/2/2025, Commented by Rolando after MCL firmware upgrade 8/20/2025
+        self.handle = self.init_handle() # Placed back by Rolando after MCL repair 10/20/2025
 
     # Handle Management
 

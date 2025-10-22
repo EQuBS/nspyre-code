@@ -5,7 +5,7 @@ Rolando A. Fimbres Grijalva 6/12/2025
 """
 from pyqtgraph.Qt import QtWidgets
 from pyqtgraph import SpinBox
-#from MCL_Madlib_Wrapper import MCL_Nanodrive 
+from MCL_Madlib_Wrapper import MCL_Nanodrive 
 import time
 
 class NanoWidget(QtWidgets.QWidget):
@@ -17,13 +17,13 @@ class NanoWidget(QtWidgets.QWidget):
             nano_driver: The MCL Nanodrive driver.
         """
         super().__init__()
-        """ #self.nano = nano
-        if nano is None or handle is None:
+        self.nano = nano
+        """ if nano is None or handle is None:
             self.nano = MCL_Nanodrive()
             self.handle = self.nano.init_handle()
         else:
             self.nano = nano
-            self.handle = handle  """
+            self.handle = handle """
         
         #handle = nano.init_handle()
 

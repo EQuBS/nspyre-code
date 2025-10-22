@@ -58,11 +58,8 @@ class SpinMeasurements:
             print("DAQ TASK ERROR!")
             
         runs = int(np.ceil(runs)) # integer no. of runs
-        #gw.ps.laser_on()
-        # execute chosen sequence on Pulse Streamer
-        #gw.ps.stream(seq, runs) # 5/28/2025 commented by Rolando, 8/25/2025 commented off by Rolando
-        #print("successfully streaming")
-        tt_data = gw.daq.get_counter_data()[0] # get the counter data from DAQ
+        samp_rate = int(1e12 / sampling_time)
+        tt_data = gw.daq.get_counter_data()[0]*samp_rate # get the counter data from TT, and convert to Counts/s by multiplying with sampling rate
         print("tt_data: ", tt_data)
         #import pdb; pdb.set_trace()
         # convert data back to numpy array from rpyc.netref data type
@@ -378,7 +375,7 @@ class SpinMeasurements:
             t_StreamingList = StreamingList([])
             PL_t_StreamingList = StreamingList([])
           
-            sampling_time = 1/sampling_rate * 1e12 # period defining sig vs time sampling rate
+            sampling_time = (1/sampling_rate)*1e12 # period defining sig vs time sampling rate
             # gw.ps.sampling_time = 1/sampling_rate * 1e9 # period defining sig vs time sampling rate
             #gw.ps.clock_time = clock_time #* 1e9 #width of our clock pulse.
             
@@ -394,32 +391,13 @@ class SpinMeasurements:
 
             for i in range(10000):
                 #print(i)
-                #gw.daq.start_counter
-                # Stream the pulse sequence by ps, meausre the signal from APD and read it out by DAQ
-                #print(time.time() - time_start) 
+                 
                 sig_result_raw = self.read(signal_array, sampling_time, n_runs, gw) # 5/28/2025 commented by Rolando 
-                #print(time.time() -time_start)
-                #print("sig_result_raw: ", sig_result_raw)
-                # keeps the laser trigger on ?
-                #gw.ps.laser_on()
-                #print("TIME 1 = ", time.time() - time_start)
-                # print("Raw signal: ", sig_result_raw)
-                
-                # Now do the math for getting the actual averaged photon counting rate
-                #delta_signal = sig_result_raw[1:] - sig_result_raw[:-1]
-                #sig_result = np.mean(delta_signal)/((n_runs-1)/sampling_rate) # TXZ: I think this is a mistake, we don't need to devide by (n_runs-1) if we are taking the np.mean already
-                sig_result = sig_result_raw[0]  #np.mean(delta_signal)*sampling_rate
-                # print("signal AFTER avg over the total sampling time: ", sig_result)
+                sig_result = sig_result_raw[0]  
                 time_pt = time.time() - time_start
-                #print("TIME 2 = ", time_pt)
-                # Update the StreamingList
                 PL_data_StreamingList.append(sig_result)
                 t_StreamingList.append(time_pt)
                 PL_t_StreamingList.append(np.array([[time_pt], [sig_result]]))
-                
-                #print("TIMES: ", t_StreamingList)
-                #print("SIG DATA: ", PL_data_StreamingList)
-                #print("PL_t_StreamingList: ", PL_t_StreamingList)
 
                 sigvstime_data.push({'title': 'Signal vs Time',
                                     'xlabel': 't',

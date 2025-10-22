@@ -124,11 +124,6 @@ class tt20:
     def count_BM(self):
         """
         Uses the TimeTagger CountBetweenMarkers measurement.
-
-        click_channel: Channel on which clicks are received, gated by begin_channel and end_channel.
-        begin_channel: Channel that triggers the beginning of counting and stepping to the next value.
-        end_channel: Channel that triggers the end of counting.
-        n_values: Number of values stored (data buffer size).
         
         Returns: The data from CountBetweenMarkers after measurement.
         """

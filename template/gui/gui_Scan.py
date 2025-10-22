@@ -309,7 +309,7 @@ class ScanWidget(QtWidgets.QWidget):
                 # Time Tagger config.
                 #self.tagger.start_counter([4], 1e8, data_points, data_points * 1e8)  # Start counter on channel 4
                 pix_start_ch = 4
-                #pix_end_ch = -4
+                pix_end_ch = -4
                 spcm_ch = 3 # eroaern
 
                 npix = nx_pix * ny_pix
@@ -319,22 +319,9 @@ class ScanWidget(QtWidgets.QWidget):
                 sync = self.tagger.synchro() #"""change"""
 
                 # Trigger levels on TT
-                self.tagger.set_trigger_level(spcm_ch, 1.0) # Sets the SPCM trigger level at 1.1 V.
-                self.tagger.set_trigger_level(pix_start_ch, 1.2) # Sets the MCL's controller trigger level at 2.5 V.
+                self.tagger.set_trigger_level(spcm_ch, 1.0) # Sets the SPCM trigger level at 1.0 V.
+                self.tagger.set_trigger_level(pix_start_ch, 1.1) # Sets the MCL's controller trigger level at 1.1 V.
 
-                # Send waveform to the MCL Nanodrive
-                """ The wfma_setup() and wfma_trigger&read are used once in order to gather the necessary data to 
-                adjust the original input waveform, through deconvolution, and use the result for the REAL scan.
-                """
-                #self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
-                #read_wfm1 = self.nano.wfma_trigger_and_read(self.nano.handle)  # Read the waveform back from the MCL Nanodrive
-                #original_output = np.ctypeslib.as_array(read_wfm1)  # Convert the read waveform to a numpy array
-                """ x_out = original_output[0] # Original X output
-                y_out = original_output[1] # Original Y output """
-
-                # I make use of the adjust input function to adjust the input waveform. 
-                """  x_corrected = self.adj_wfm("x", x_out, x_wfm)
-                y_corrected = self.adj_wfm("y", y_out, y_wfm) """
 
                 """ I make use of the NEW corrected waveforms to run the REAL Scan. In summary 
                 I'll use wfma_setup(), and wfma_trigger_and_read() again. I need to read the 
@@ -343,40 +330,20 @@ class ScanWidget(QtWidgets.QWidget):
                 self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle) # Input waveform
                 self.nano.iss_bind_clock_to_axis(1, 2, 1, self.nano.handle)  # Bind clock to X-Axis, Changed 7/18/2025 
                 # final_trigger = self.nano.wfma_trigger_and_read(self.nano.handle)
-                
-
-                # Read output waveform after adjustment
-                #final_read = self.nano.wfma_read(self.nano.handle)
 
                 # Counting events
-                self.tagger.start_cbm(tagger=sync, click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values= npix)
-                self.tagger.start_counter(tagger=sync, channels=[spcm_ch, pix_start_ch], binwidth=duration*1e9, n_values=npix, measurement_duration=npix*(duration*1e9))
+                self.tagger.start_cbm(tagger=sync, click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values=npix)
+                self.tagger.start_counter(tagger=sync, channels=[pix_start_ch], binwidth=duration*1e9, n_values=npix) # In TT driver "measurement_duration=npix*(duration*1e9)" is no longer required.
                 self.tagger.start_countrate(tagger=sync, channels=[spcm_ch, pix_start_ch], measurement_duration=npix*(duration*1e9))  # 100 values, 10ns resolution
                 
-                #print("Triggered scan with", data_points, "points.")
-                self.nano.wfma_trigger(self.nano.handle) # We cannot use the wfma_trigger_and_read() function here. I wanted the real output position waveforms and use them. 7/28/2025
-
+               
                 # StartFor and WaitUntilFinished synchronized measurements
-                self.tagger.sync_sFor(data_points*duration*1e9) #"""change # duration in ps """
+                margin = int(0.2 * data_points * duration * 1e9)
+                self.tagger.sync_sFor(data_points*duration*1e9 + margin) #"""change # duration in ps """
+                self.nano.wfma_trigger(self.nano.handle) # We cannot use the wfma_trigger_and_read() function here. I wanted the real output position waveforms and use them. 7/28/2025
                 self.tagger.sync_wait() # """change # Start synchronized measurement for the specified duration in seconds"""
 
-
-                """ final_output = np.ctypeslib.as_array(final_trigger)  # Convert the read waveform to a numpy array
-                x_final = final_output[0]  # Final X output
-                y_final = final_output[1]  # Final Y output """
-
                 cbm_remote = self.tagger.count_BM() # getData() for CountBetweenMarkers
-                # Wait for a moment to allow TTL pulses to start
-                #time.sleep(0.5)
-
-                """ # Start countrate on channels 3 (SPCM) and 4 (Pixel Clock)"""
-                #self.tagger.start_countrate([3, 4], (nx_pix*ny_pix)*(duration*1e9))  # or use your constants if defined
-                #time.sleep(1)  # Let it collect for a second
-                #counts = self.tagger.get_countrate_data()
-                #print("Tagger Count Rates (Hz):", counts) 
-                
-                
-                #time.sleep(npix*(duration*1e-3) + 0.2)
                 cbm = obtain(cbm_remote)
                 
                 # Troubleshooting
@@ -391,8 +358,8 @@ class ScanWidget(QtWidgets.QWidget):
                 #time.sleep(0.1)
                 spcm_counts = self.tagger.get_counter_data() # getData() for SPCM Counter and TTLs
                 spcm_rate = self.tagger.get_countrate_data() # getData() for SPCM Count Rate
-                print("Raw SPCM counter:", spcm_counts)
-                print("SPCM count rate:", spcm_rate)
+                print("TTL counter:", spcm_counts)
+                print("Count rate:", spcm_rate)
                 
                 spcm_c = obtain(spcm_counts)  # Convert remote data to local numpy array
 
@@ -450,72 +417,10 @@ class ScanWidget(QtWidgets.QWidget):
                 plt.ylabel('Y (µm)')
                 plt.title('Scan Counts')
                 plt.colorbar(label='Counts')
-                plt.show()
+                plt.show(block=False)
 
                 # Check for accuracy of the NanoDrive's positioning
                 #QMessageBox.information(self, f"Scan completed successfully.\n{self.print_avg_percentage_error(final_read[0], x_wfm, 'X-axis')}\n{self.print_avg_percentage_error(final_read[1], y_wfm, 'Y-axis')}.")
-
-                """
-                y_lines = int(total_y_length/step_size)
-                
-                for i in range(y_lines):
-                    y_pos = self.y_min_box.value() + i * step_size
-                    if i % 2 == 0:
-                        x_wfm.extend(x_line_for)
-                    else:
-                        x_wfm.extend(x_line_bac)
-                    y_wfm.extend([y_pos] * len(x_line_for)) 
-                
-                x_wfm = np.array(x_wfm, dtype=np.float64)
-                y_wfm = np.array(y_wfm, dtype=np.float64)
-                #data_points = len(x_wfm) + len(y_wfm)
-                
-                duration = 5 # Time in milliseconds between data points (from 0.1ms to 5ms)
-                iter = 1 # Number of iterations for the waveform. We can add a SpinBox to change this value in the future.
-                self.nano.wfma_setup(x_wfm, y_wfm, None, data_points, duration, iter, self.nano.handle)
-                print(x_wfm)
-                self.nano.iss_bind_clock_to_axis(1 , 2, 6, self.nano.handle)  # Bind clock to Waveform Write 
-                self.nano.wfma_trigger(self.nano.handle)
-
-                #self.tagger.start_countrate([4], duration * 1000)  # Start countrate measurement on channel 4  
-                self.tagger.start_counter([4], 1e8, data_points, data_points*1e8)
-                
-                # We create a measurment object for intensity scanning.
-                pix_start_ch = 4 # Rising edge on input channel 4
-                pix_end_ch = -4 # Falling edge on input channel 4
-                spcm_ch = 3 # Channel for the SPCM
-                self.tagger.set_trigger_level(spcm_ch, 1.1)  # Set trigger level for SPCM channel
-                self.tagger.set_trigger_level(pix_start_ch, 2.5)  # Set trigger level for pixel start channel
-                nx_pix = self.data_points_x.value()  # Number of pixels in X direction
-                ny_pix = self.data_points_y.value()  # Number of pixels in Y direction
-                npix = nx_pix * ny_pix
-                cbm = self.tagger.count_BM(spcm_ch, pix_start_ch, pix_end_ch, npix)
-                #counts_remote = cbm.getData()  # Get the counts data
-                counts = obtain(cbm) # Convert remote data to local numpy array
-                """
-
-                """  # Push scan data to the data server
-                scan_data.push({
-                    'title': 'XY Scan',    
-                    'xLabel': 'X (um)',
-                    'yLabel': 'Y (um)',
-                    'zLabel': 'Counts',
-                    'datasets': {
-                        'xSteps': x_wfm,
-                        'ySteps': y_wfm,
-                        'ScanCounts': img
-                    }
-                }) """
-
-                # For immediate visualization with matplotlib (as before):
-                """ img = np.reshape(cbm, (nx_pix, ny_pix))  # Reshape counts to image format
-                plt.figure()
-                plt.imshow(img, cmap='hot', origin='lower', aspect='auto')
-                plt.xlabel('X pixel')
-                plt.ylabel('Y pixel')
-                plt.title('Scan Counts')
-                plt.colorbar(label='Counts')
-                plt.show() """
                 
             
         start_xy.clicked.connect(scan_xy)
@@ -650,7 +555,7 @@ class ScanWidget(QtWidgets.QWidget):
                 
                 # Counting events
                 self.tagger.start_cbm(tagger=sync2, click_channel=spcm_ch, begin_channel=pix_start_ch, end_channel=CHANNEL_UNUSED, n_values= npix)
-                self.tagger.start_counter(tagger=sync2, channels=[spcm_ch, pix_start_ch], binwidth=duration*1e9, n_values=npix, measurement_duration=npix*(duration*1e9))
+                self.tagger.start_counter(tagger=sync2, channels=[spcm_ch, pix_start_ch], binwidth=duration*1e9, n_values=npix) # In TT driver "measurement_duration=npix*(duration*1e9)" is no longer required.
                 self.tagger.start_countrate(tagger=sync2, channels=[spcm_ch, pix_start_ch], measurement_duration=npix*(duration*1e9))  # 100 values, 10ns resolution
 
                 #print("Triggered scan with", data_points, "points.")
