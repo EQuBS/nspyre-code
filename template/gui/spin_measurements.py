@@ -1855,9 +1855,9 @@ class SpinMeasurements:
             averaged_counts = []
 
             # MCL Setup
-            gw.nano.iss_bind_clock_to_axis(1, 2, 1, self.nano.handle)
-            gw.nano.single_write_n(axis1_forward[0], 1, self.nano.handle)
-            gw.nano.single_write_n(axis2[0], 2, self.nano.handle)
+            gw.nano.iss_bind_clock_to_axis(1, 2, 1, gw.nano.handle) 
+            gw.nano.single_write_n(axis1_forward[0], 1, gw.nano.handle)
+            gw.nano.single_write_n(axis2[0], 2, gw.nano.handle)
             dwell_time = kwargs['Dwell_Time']
 
             # Turn on the laser
@@ -1872,36 +1872,36 @@ class SpinMeasurements:
             # Scanning Loop
             for index_axis2 in range(len(axis2)):
                 # Move forward
-                gw.nano.wfma_setup(axis1_forward, None, None, setup_points, 5, 1, self.nano.handle)
+                gw.nano.wfma_setup(axis1_forward, None, None, setup_points, dwell_time, 1, gw.nano.handle)
                 gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
                 gw.daq.CBM_start()
                 gw.daq.sync()
-                gw.nano.wfma_trigger(self.nano.handle)
+                gw.nano.wfma_trigger(gw.nano.handle)
                 ready = False
                 while ready is False:
                     ready = gw.daq.cbm_ready()
                     counts_forward = gw.daq.count_BM()
                 gw.daq.cbm_clear()
-                forward_counts.append(counts_forward)
+                forward_counts.append(obtain(counts_forward))
                 time.sleep(0.2)
                 # Move backwards
-                gw.nano.wfma_setup(axis1_backward, None, None, setup_points, 5, 1, self.nano.handle)
+                gw.nano.wfma_setup(axis1_backward, None, None, setup_points, dwell_time, 1, gw.nano.handle)
                 gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
                 gw.daq.CBM_start()
                 gw.daq.sync()
-                gw.nano.wfma_trigger(self.nano.handle)
+                gw.nano.wfma_trigger(gw.nano.handle)
                 ready = False
                 while ready is False:
                     ready = gw.daq.cbm_ready()
                     counts_backward = gw.daq.count_BM()
                 gw.daq.cbm_clear()
                 counts_backward = counts_backward[::-1] # Reverse backward counts to match forward scan direction
-                backward_counts.append(counts_backward)
+                backward_counts.append(obtain(counts_backward))
                 avg_counts = np.mean([counts_forward, counts_backward], axis=0).astype(int)
                 averaged_counts.append(avg_counts)
                 # Move in axis 2
                 if index_axis2 + 1 < len(axis2):
-                    gw.nano.single_write_n(axis2[index_axis2 + 1], 2, self.nano.handle)
+                    gw.nano.single_write_n(axis2[index_axis2 + 1], 2, gw.nano.handle)
             
             # Free sources and turn off the laser, SPCM
             gw.laser.set_power(0)
@@ -1910,29 +1910,43 @@ class SpinMeasurements:
             gw.ps.constant_off()
             gw.ps.ps_reset()
             gw.daq.free_time_tagger()
+            gw.nano.release_handle(gw.nano.handle)
+
+            print("*** 2D Scan data acquisition completed ***")
 
             # Normalize data
-            forward = np.array(forward_counts, dtype=float)
-            forward = forward / (5e-3)  # Convert to counts per second
-            forward = np.rint(forward).astype(int)
+            forward_cps = np.array(forward_counts, dtype=float)
+            forward_cps = forward_cps / (dwell_time*1e-3)  # Convert to counts per second
+            forward_cps = np.rint(forward_cps).astype(int)
 
-            backward = np.array(backward_counts, dtype=float)
-            backward = backward / (5e-3)  # Convert to counts per second
-            backward = np.rint(backward).astype(int)
+            backward_cps = np.array(backward_counts, dtype=float)
+            backward_cps = backward_cps / (dwell_time*1e-3)  # Convert to counts per second
+            backward_cps = np.rint(backward_cps).astype(int)
 
-            avg = np.array(averaged_counts, dtype=float) 
-            avg = avg / (5e-3)  # Convert to counts per second
-            avg = np.rint(avg).astype(int)
+            avg_cps = np.array(averaged_counts, dtype=float) 
+            avg_cps = avg_cps / (dwell_time*1e-3)  # Convert to counts per second
+            avg_cps = np.rint(avg_cps).astype(int)
 
             # Mapping setup (positions, extents, min-max values)
             axis1_positions = axis1_forward[:data_points]
             axis2_positions = axis2
-            extent = (axis1_positions[0], axis1_positions[-1], axis2_positions[0], axis2_positions[-1])
+            """ extent = (axis1_positions[0], axis1_positions[-1], axis2_positions[0], axis2_positions[-1])
             vmin = min(np.min(forward), np.min(backward), np.min(avg))
-            vmax = max(np.max(forward), np.max(backward), np.max(avg))
+            vmax = max(np.max(forward), np.max(backward), np.max(avg)) """
+
+            if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                gw.laser.set_power(0)
+                gw.laser.get_power()
+                gw.laser.off()   
+                gw.ps.constant_off()
+                gw.ps.ps_reset()
+                gw.daq.free_time_tagger()
+                gw.nano.release_handle(gw.nano.handle)
+                print('the GUI has asked us nicely to exit')
+                return
 
             # Push data to data server
-            """ scan_data.push({
+            scan_data.push({
                 'title': 'XY Scan',    
                 'xLabel': 'X (um)',
                 'yLabel': 'Y (um)',
@@ -1940,11 +1954,11 @@ class SpinMeasurements:
                 'datasets': {
                     'xSteps': axis1_positions,
                     'ySteps': axis2_positions,
-                    'ScanCounts': img
+                    'Scan_Forward': forward_cps,
+                    'Scan_Backward': backward_cps,
+                    'Scan_Averaged': avg_cps
                 }
-            }) """
-
-            # Visualization Matplotlib
+            })
 
     def DEER_FID_run_Evan(self, **kwargs):
         '''

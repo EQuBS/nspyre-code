@@ -30,6 +30,7 @@ from template.drivers.dlnsec import DLnsec
 from template.drivers.ps82 import PS82
 import template.gui.spin_measurements
 import template.gui.gui_Nano
+import template.gui.gui_2D_Scan
 import template.gui.gui_Scan
 import template.gui.gui_ScanXZ
 import template.gui.gui_ODMR
@@ -94,6 +95,7 @@ def main():
                 'Subsystems': MainWidgetItem(nspyre.gui.widgets.subsystem, 'SubsystemsWidget', args=[insmgr.subs.subsystems], stretch=(1, 1)),
                 'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano], stretch=(1, 1)),
                 'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
+                '2D-Scan': MainWidgetItem(template.gui.gui_2D_Scan, 'TwoD_Scan', stretch=(1, 1)),
                 'XZ-Scan': MainWidgetItem(template.gui.gui_ScanXZ, 'ScanXZ', stretch=(1, 1)),
                 'ODMR': MainWidgetItem(template.gui.gui_ODMR, 'ODMR_Widget', args=[pulse_streamer_driver], stretch=(1, 1)),
                 'Rabi': MainWidgetItem(template.gui.gui_Rabi, 'RabiWidget', stretch=(1, 1)),
@@ -114,7 +116,7 @@ def main():
                         stretch=(100, 100),
                     ),
                     'ScanPlot': MainWidgetItem(
-                        template.gui.gui_Scan,
+                        template.gui.gui_2D_Scan,
                         'ScanPlotWidget',
                         stretch=(100, 100),
                     ),

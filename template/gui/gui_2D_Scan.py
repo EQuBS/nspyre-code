@@ -118,3 +118,37 @@ class TwoD_Scan(ExperimentWidget):
                          'SpinMeasurements',
                          'Two_D_Scan_R',
                          title='2D_Scan')
+        
+def process_2D_Scan_data(sink: DataSink):
+    # Retrieve Scan Data
+    axis1 = sink.datasets['xSteps']
+    axis2 = sink.datasets['ySteps']
+    scan_forward = sink.datasets['Scan_Forward']
+    scan_backward = sink.datasets['Scan_Backward']
+    scan_averaged = sink.datasets['Scan_Averaged']
+
+    # Visualization parameters
+    extent = (axis1[0], axis1[-1], axis2[0], axis2[-1])
+    vmin = min(np.min(scan_forward), np.min(scan_backward), np.min(scan_averaged))
+    vmax = max(np.max(scan_forward), np.max(scan_backward), np.max(scan_averaged))
+    # Create Heatmap Widgets
+
+class ScanPlotWidget(HeatMapWidget):
+    def __init__(self):
+        title = '2D_Scan'
+        #super().__init__(title=title, btm_label='X', lft_label='Y', colormap = 0.5)
+        super().__init__(title=title, btm_label='X (um)', lft_label='Y (um)', colormap = None)
+
+
+    def setup(self):
+        self.sink = DataSink('2D_Scan')
+        self.sink.__enter__()
+
+
+    def teardown(self):
+        self.sink.__exit__()
+
+
+    def update(self):
+        self.sink.pop() #wait for some data to be saved to sink
+        self.set_data(self.sink.datasets['xSteps'], self.sink.datasets['ySteps'], self.sink.datasets['Scan_Forward'])
