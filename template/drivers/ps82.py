@@ -197,14 +197,14 @@ class PS82():
     def laser_on(self):
         return self.ps.constant(OutputState([self.channel_dict["laser"]], 0.0, 0.0))
 
-    def gate_on(self):
+    def spcm_laser_on(self):
         # Gate AND Laser ON
         self.ps.constant(OutputState([self.channel_dict["gate"], self.channel_dict["laser"]], 0.0, 0.0))
     
     def just_gate_on(self):
         self.ps.constant(OutputState([self.channel_dict["gate"]], 0.0, 0.0))
 
-    def gate_off(self):
+    def constant_off(self):
         # Gate AND Laser OFF
         self.ps.constant(OutputState([], 0.0, 0.0))
 

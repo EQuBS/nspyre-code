@@ -120,6 +120,9 @@ class tt20:
         self.cbm.startFor(duration)
         self.cbm.waitUntilFinished(duration)
 
+    def cbm_clear(self):
+        self.cbm.clear()
+
     #Counts between marked events, introd. 6/27/2025 by Rolando
     def count_BM(self):
         """

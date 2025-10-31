@@ -1802,6 +1802,149 @@ class SpinMeasurements:
         gw.ps.ps_reset()
         gw.daq.free_time_tagger()
 
+    def Two_D_Scan_R(self, **kwargs):
+        """
+        Rolando 10/30/2025
+
+        2D Scanning function using the 'Safe-Scan' approach.
+        """
+        with InstrumentGateway() as gw, DataSource('2D_Scan') as scan_data:
+        
+            # Functions
+            def movement_arrays(x_min, x_max, y_min, y_max, datapoints):
+                x_for = np.linspace(x_min, x_max, datapoints) # Forward 1D array of datapoint in x
+                # Dummy point for bining purposes
+                x_for = np.append(x_for, x_for[-1])
+                x_bac = x_for[::-1]                      # Backward 1D array of datapoint in x
+                y = np.linspace(y_min, y_max, datapoints)     # Y 1D array
+                return x_for, x_bac, y
+            
+            # Parameter Setup
+            def two_selected(self):
+                """ Returns True if exactly two of the three axis checkboxes are checked."""
+                # Obtain those values
+                x_axis = kwargs['Select X']['widget']
+                y_axis = kwargs['Select Y']['widget']
+                z_axis = kwargs['Select Z']['widget']
+                # Count how many are checked
+                checked_count = sum([x_axis.isChecked(), y_axis.isChecked(), z_axis.isChecked()])
+                return checked_count == 2
+            
+            # Scanned Waveform parameters
+            axis1_min = 100 + kwargs['Axis_Min_1']
+            axis1_max = 100 + kwargs['Axis_Max_1']
+            axis2_min = 100 + kwargs['Axis_Min_2']
+            axis2_max = 100 + kwargs['Axis_Max_2']
+            data_points = kwargs['Data_Points']
+            axis1_forward, axis1_backward, axis2 = movement_arrays(axis1_min, axis1_max, axis2_min, axis2_max, data_points)
+            setup_points = len(axis1_forward)
+
+            # Pulse Streamer parameters
+            ps_spcm = 3
+            ps_laser = 7
+
+            # Time Tagger parameters
+            tt_spcm = 3
+            tt_ttl = 4
+            gw.daq.set_trigger_level(tt_spcm, 1.1)
+            gw.daq.set_trigger_level(tt_ttl, 1.1)
+
+            # Count storage
+            forward_counts = []
+            backward_counts = []
+            averaged_counts = []
+
+            # MCL Setup
+            gw.nano.iss_bind_clock_to_axis(1, 2, 1, self.nano.handle)
+            gw.nano.single_write_n(axis1_forward[0], 1, self.nano.handle)
+            gw.nano.single_write_n(axis2[0], 2, self.nano.handle)
+            dwell_time = kwargs['Dwell_Time']
+
+            # Turn on the laser
+            gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['Laser_Power']) # set laser power to 10%
+            gw.laser.on()
+
+            # Enable Laser and SPCM with Pulse Streamer
+            gw.ps.spcm_laser_on()
+
+            # Scanning Loop
+            for index_axis2 in range(len(axis2)):
+                # Move forward
+                gw.nano.wfma_setup(axis1_forward, None, None, setup_points, 5, 1, self.nano.handle)
+                gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
+                gw.daq.CBM_start()
+                gw.daq.sync()
+                gw.nano.wfma_trigger(self.nano.handle)
+                ready = False
+                while ready is False:
+                    ready = gw.daq.cbm_ready()
+                    counts_forward = gw.daq.count_BM()
+                gw.daq.cbm_clear()
+                forward_counts.append(counts_forward)
+                time.sleep(0.2)
+                # Move backwards
+                gw.nano.wfma_setup(axis1_backward, None, None, setup_points, 5, 1, self.nano.handle)
+                gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
+                gw.daq.CBM_start()
+                gw.daq.sync()
+                gw.nano.wfma_trigger(self.nano.handle)
+                ready = False
+                while ready is False:
+                    ready = gw.daq.cbm_ready()
+                    counts_backward = gw.daq.count_BM()
+                gw.daq.cbm_clear()
+                counts_backward = counts_backward[::-1] # Reverse backward counts to match forward scan direction
+                backward_counts.append(counts_backward)
+                avg_counts = np.mean([counts_forward, counts_backward], axis=0).astype(int)
+                averaged_counts.append(avg_counts)
+                # Move in axis 2
+                if index_axis2 + 1 < len(axis2):
+                    gw.nano.single_write_n(axis2[index_axis2 + 1], 2, self.nano.handle)
+            
+            # Free sources and turn off the laser, SPCM
+            gw.laser.set_power(0)
+            gw.laser.get_power()
+            gw.laser.off()   
+            gw.ps.constant_off()
+            gw.ps.ps_reset()
+            gw.daq.free_time_tagger()
+
+            # Normalize data
+            forward = np.array(forward_counts, dtype=float)
+            forward = forward / (5e-3)  # Convert to counts per second
+            forward = np.rint(forward).astype(int)
+
+            backward = np.array(backward_counts, dtype=float)
+            backward = backward / (5e-3)  # Convert to counts per second
+            backward = np.rint(backward).astype(int)
+
+            avg = np.array(averaged_counts, dtype=float) 
+            avg = avg / (5e-3)  # Convert to counts per second
+            avg = np.rint(avg).astype(int)
+
+            # Mapping setup (positions, extents, min-max values)
+            axis1_positions = axis1_forward[:data_points]
+            axis2_positions = axis2
+            extent = (axis1_positions[0], axis1_positions[-1], axis2_positions[0], axis2_positions[-1])
+            vmin = min(np.min(forward), np.min(backward), np.min(avg))
+            vmax = max(np.max(forward), np.max(backward), np.max(avg))
+
+            # Push data to data server
+            """ scan_data.push({
+                'title': 'XY Scan',    
+                'xLabel': 'X (um)',
+                'yLabel': 'Y (um)',
+                'zLabel': 'Counts',
+                'datasets': {
+                    'xSteps': axis1_positions,
+                    'ySteps': axis2_positions,
+                    'ScanCounts': img
+                }
+            }) """
+
+            # Visualization Matplotlib
 
     def DEER_FID_run_Evan(self, **kwargs):
         '''
