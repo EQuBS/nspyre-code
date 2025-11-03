@@ -152,3 +152,32 @@ class ScanPlotWidget(HeatMapWidget):
     def update(self):
         self.sink.pop() #wait for some data to be saved to sink
         self.set_data(self.sink.datasets['xSteps'], self.sink.datasets['ySteps'], self.sink.datasets['Scan_Forward'])
+        ######  Modification 
+        self.sink.pop()
+        # read arrays
+        x = np.asarray(self.sink.datasets['xSteps'])
+        y = np.asarray(self.sink.datasets['ySteps'])
+        img = np.asarray(self.sink.datasets['Scan_Forward'])
+        # Ensure image has shape (len(y), len(x))
+        if img.shape != (len(y), len(x)):
+            if img.size == len(x) * len(y):
+                img = img.reshape((len(y), len(x)))
+            elif img.T.shape == (len(y), len(x)):
+                img = img.T
+        # apply matplotlib-like extent offsets (subtract 100 from min/max)
+        x_min_adj, x_max_adj = x.min() - 100.0, x.max() - 100.0
+        y_min_adj, y_max_adj = y.min() - 100.0, y.max() - 100.0
+        # per-pixel steps (use len-1 for endpoint spacing)
+        x_step = (x_max_adj - x_min_adj) / (len(x) - 1) if len(x) > 1 else 1.0
+        y_step = (y_max_adj - y_min_adj) / (len(y) - 1) if len(y) > 1 else 1.0
+        img_for_view = img
+        self.image_view.setImage(
+            img_for_view,
+            pos=[x_min_adj, y_min_adj],
+            scale=[x_step, y_step],
+            autoRange=False,
+            autoLevels=True,
+            autoHistogramRange=False,            
+            axes={'x': 1, 'y': 0},
+            levelMode='mono'
+        )

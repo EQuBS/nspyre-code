@@ -1819,29 +1819,54 @@ class SpinMeasurements:
                 y = np.linspace(y_min, y_max, datapoints)     # Y 1D array
                 return x_for, x_bac, y
             
+            def _checkbox_state(entry):
+                """Return True if entry represents a checked box.
+                   entry may be a bool or dict {'widget': QCheckBox}."""
+                if isinstance(entry, dict):
+                    w = entry.get('widget')
+                    try:
+                        return bool(w.isChecked())
+                    except Exception:
+                        return False
+                return bool(entry)
+
+            def two_selected():
+                """Return True if exactly two of the three axis checkboxes are checked."""
+                cnt = sum([
+                    _checkbox_state(kwargs.get('Select X')),
+                    _checkbox_state(kwargs.get('Select Y')),
+                    _checkbox_state(kwargs.get('Select Z')),
+                ])
+                return cnt == 2
+
+            # enforce exactly-two selection and determine scanned_axis2
+            if not two_selected():
+                scanned_axis2 = None
+                print("Error: You must select exactly two axes.")
+            else:
+                # choose the non-X axis as axis2 (prefer Y if both present)
+                if _checkbox_state(kwargs.get('Select Y')):
+                    scanned_axis2 = 2
+                elif _checkbox_state(kwargs.get('Select Z')):
+                    scanned_axis2 = 3
+                else:
+                    scanned_axis2 = None
+
             # Parameter Setup
-            def two_selected(self):
-                """ Returns True if exactly two of the three axis checkboxes are checked."""
-                # Obtain those values
-                x_axis = kwargs['Select X']['widget']
-                y_axis = kwargs['Select Y']['widget']
-                z_axis = kwargs['Select Z']['widget']
-                # Count how many are checked
-                checked_count = sum([x_axis.isChecked(), y_axis.isChecked(), z_axis.isChecked()])
-                return checked_count == 2
-            
+
             # Scanned Waveform parameters
-            axis1_min = 100 + kwargs['Axis_Min_1']
-            axis1_max = 100 + kwargs['Axis_Max_1']
-            axis2_min = 100 + kwargs['Axis_Min_2']
-            axis2_max = 100 + kwargs['Axis_Max_2']
+            zero_offset_um = 100  # in µm
+            axis1_min = zero_offset_um + kwargs['Axis_Min_1']
+            axis1_max = zero_offset_um + kwargs['Axis_Max_1']
+            axis2_min = zero_offset_um + kwargs['Axis_Min_2']
+            axis2_max = zero_offset_um + kwargs['Axis_Max_2']
             data_points = kwargs['Data_Points']
             axis1_forward, axis1_backward, axis2 = movement_arrays(axis1_min, axis1_max, axis2_min, axis2_max, data_points)
             setup_points = len(axis1_forward)
 
             # Pulse Streamer parameters
-            ps_spcm = 3
-            ps_laser = 7
+            #ps_spcm = 3
+            #ps_laser = 7
 
             # Time Tagger parameters
             tt_spcm = 3
@@ -1901,7 +1926,7 @@ class SpinMeasurements:
                 averaged_counts.append(avg_counts)
                 # Move in axis 2
                 if index_axis2 + 1 < len(axis2):
-                    gw.nano.single_write_n(axis2[index_axis2 + 1], 2, gw.nano.handle)
+                    gw.nano.single_write_n(axis2[index_axis2 + 1], scanned_axis2, gw.nano.handle)
             
             # Free sources and turn off the laser, SPCM
             gw.laser.set_power(0)
@@ -1909,8 +1934,8 @@ class SpinMeasurements:
             gw.laser.off()   
             gw.ps.constant_off()
             gw.ps.ps_reset()
-            gw.daq.free_time_tagger()
-            gw.nano.release_handle(gw.nano.handle)
+            #gw.daq.free_time_tagger()
+            #gw.nano.release_handle(gw.nano.handle)
 
             print("*** 2D Scan data acquisition completed ***")
 
@@ -1928,8 +1953,8 @@ class SpinMeasurements:
             avg_cps = np.rint(avg_cps).astype(int)
 
             # Mapping setup (positions, extents, min-max values)
-            axis1_positions = axis1_forward[:data_points]
-            axis2_positions = axis2
+            axis1_positions = np.array(axis1_forward[:data_points], dtype=np.float64) - zero_offset_um
+            axis2_positions = np.array(axis2, dtype=np.float64) - zero_offset_um
             """ extent = (axis1_positions[0], axis1_positions[-1], axis2_positions[0], axis2_positions[-1])
             vmin = min(np.min(forward), np.min(backward), np.min(avg))
             vmax = max(np.max(forward), np.max(backward), np.max(avg)) """
