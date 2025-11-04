@@ -656,11 +656,11 @@ class ScanWidget(QtWidgets.QWidget):
         
         # Gate (SPCM) on button
         gate_on_button = QtWidgets.QPushButton('Gate/Laser On ')
-        gate_on_button.clicked.connect(lambda: self.ps.gate_on())
+        gate_on_button.clicked.connect(lambda: self.ps.spcm_laser_on())
         layout.addWidget(gate_on_button, layout_row, 1)
         # Gate (SPCM) off button
         gate_off_button = QtWidgets.QPushButton('Gate/Laser Off')
-        gate_off_button.clicked.connect(lambda: self.ps.gate_off())
+        gate_off_button.clicked.connect(lambda: self.ps.constant_off())
         layout.addWidget(gate_off_button, layout_row, 2)
         """  # Laser trigger button
         gate_off_button = QtWidgets.QPushButton('Laser Trigger')

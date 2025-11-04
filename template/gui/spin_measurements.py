@@ -903,7 +903,7 @@ class SpinMeasurements:
         print(8)
         gw.laser.off()
         #gw.ps.constant(OutputState([], 0.0, 0.0))
-        gw.ps.gate_off()
+        gw.ps.constant_off()
         gw.ps.ps_reset()
         gw.daq.free_time_tagger()
 
