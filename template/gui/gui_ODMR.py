@@ -93,7 +93,7 @@ class ODMR_Widget(ExperimentWidget):
             'probe_time': {
                 'display_text': 'MW Probe Time',
                 'widget': SpinBox(
-                    value = 5e-5,
+                    value = 50e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (10e-9, None),

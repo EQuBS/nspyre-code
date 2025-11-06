@@ -843,7 +843,7 @@ class SpinMeasurements:
                         print("Background counts: ", counter_data[0][6])
 
                     elif kwargs['odmr_type'] == 'Pulsed':
-                        runs = 3000
+                        runs = 1000
                         gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, runs*2)
                         gw.daq.CBM_start()
                         gw.daq.sync()
@@ -1910,20 +1910,20 @@ class SpinMeasurements:
                 forward_counts.append(obtain(counts_forward))
                 time.sleep(0.2)
                 # Move backwards
-                gw.nano.wfma_setup(axis1_backward, None, None, setup_points, dwell_time, 1, gw.nano.handle)
-                gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
-                gw.daq.CBM_start()
-                gw.daq.sync()
-                gw.nano.wfma_trigger(gw.nano.handle)
-                ready = False
-                while ready is False:
-                    ready = gw.daq.cbm_ready()
-                    counts_backward = gw.daq.count_BM()
-                gw.daq.cbm_clear()
-                counts_backward = counts_backward[::-1] # Reverse backward counts to match forward scan direction
-                backward_counts.append(obtain(counts_backward))
-                avg_counts = np.mean([counts_forward, counts_backward], axis=0).astype(int)
-                averaged_counts.append(avg_counts)
+                #gw.nano.wfma_setup(axis1_backward, None, None, setup_points, dwell_time, 1, gw.nano.handle)
+                #gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
+                #gw.daq.CBM_start()
+                #gw.daq.sync()
+                #gw.nano.wfma_trigger(gw.nano.handle)
+                #ready = False
+                #while ready is False:
+                #    ready = gw.daq.cbm_ready()
+                #    counts_backward = gw.daq.count_BM()
+                #gw.daq.cbm_clear()
+                #counts_backward = counts_backward[::-1] # Reverse backward counts to match forward scan direction
+                #backward_counts.append(obtain(counts_backward))
+                #avg_counts = np.mean([counts_forward, counts_backward], axis=0).astype(int)
+                #averaged_counts.append(avg_counts)
                 # Move in axis 2
                 if index_axis2 + 1 < len(axis2):
                     gw.nano.single_write_n(axis2[index_axis2 + 1], scanned_axis2, gw.nano.handle)
@@ -1944,13 +1944,13 @@ class SpinMeasurements:
             forward_cps = forward_cps / (dwell_time*1e-3)  # Convert to counts per second
             forward_cps = np.rint(forward_cps).astype(int)
 
-            backward_cps = np.array(backward_counts, dtype=float)
-            backward_cps = backward_cps / (dwell_time*1e-3)  # Convert to counts per second
-            backward_cps = np.rint(backward_cps).astype(int)
+            #backward_cps = np.array(backward_counts, dtype=float)
+            #backward_cps = backward_cps / (dwell_time*1e-3)  # Convert to counts per second
+            #backward_cps = np.rint(backward_cps).astype(int)
 
-            avg_cps = np.array(averaged_counts, dtype=float) 
-            avg_cps = avg_cps / (dwell_time*1e-3)  # Convert to counts per second
-            avg_cps = np.rint(avg_cps).astype(int)
+            #avg_cps = np.array(averaged_counts, dtype=float) 
+            #avg_cps = avg_cps / (dwell_time*1e-3)  # Convert to counts per second
+            #avg_cps = np.rint(avg_cps).astype(int)
 
             # Mapping setup (positions, extents, min-max values)
             axis1_positions = np.array(axis1_forward[:data_points], dtype=np.float64) - zero_offset_um
@@ -1980,8 +1980,8 @@ class SpinMeasurements:
                     'xSteps': axis1_positions,
                     'ySteps': axis2_positions,
                     'Scan_Forward': forward_cps,
-                    'Scan_Backward': backward_cps,
-                    'Scan_Averaged': avg_cps
+                    #'Scan_Backward': backward_cps,
+                    #'Scan_Averaged': avg_cps
                 }
             })
 
