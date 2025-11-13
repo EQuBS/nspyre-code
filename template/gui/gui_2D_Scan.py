@@ -152,7 +152,7 @@ class ScanPlotWidget(HeatMapWidget):
 
     def update(self):
         # Following block was commented out for modification, Rolando 11/5/2025
-        """ self.sink.pop() #wait for some data to be saved to sink
+        self.sink.pop() #wait for some data to be saved to sink
         self.set_data(self.sink.datasets['xSteps'], self.sink.datasets['ySteps'], self.sink.datasets['Scan_Forward'])
         ######  Modification 
         self.sink.pop()
@@ -182,15 +182,15 @@ class ScanPlotWidget(HeatMapWidget):
             autoHistogramRange=False,            
             axes={'x': 1, 'y': 0},
             levelMode='mono'
-        ) """
-        self.sink.pop()  # wait for new data
+        ) 
+        """ self.sink.pop()  # wait for new data
         # If your measurement already publishes display axes (no +100 offset),
         # keep the next line as-is. Otherwise, subtract the offset here:
         OFFSET = 0.0  # set to 100.0 only if your datasets carry the hardware offset
         x = np.asarray(self.sink.datasets['xSteps']) - OFFSET
         y = np.asarray(self.sink.datasets['ySteps']) - OFFSET
         img = np.asarray(self.sink.datasets['Scan_Forward'])
-        self.set_data(x, y, img)
+        self.set_data(x, y, img) """
 
     def _on_point_clicked(self, x, y, value, ix, iy, iz):
         print(f"Heatmap click -> x={x:.3f} µm, y={y:.3f} µm, cps={value:.0f} (ix={ix}, iy={iy})")

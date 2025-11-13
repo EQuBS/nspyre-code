@@ -41,12 +41,21 @@ class SigVsTimeWidget(ExperimentWidget):
             'sampling_rate': {
                     'display_text': 'Sampling Rate: ',
                     'widget': SpinBox(
-                        value = 1e3,
+                        value = 10,
                         suffix = 'Hz',
                         siPrefix = True,
                         bounds = (None, 1e6),
                     ),
                 },
+            'laser_power': {
+                'display_text': 'Laser Power [%]',
+                'widget': SpinBox(
+                    value = 5,
+                    int = True,
+                    bounds = (0, 100),
+                    dec = True,
+                ),
+            },
         }
 
         super().__init__(params_config, 

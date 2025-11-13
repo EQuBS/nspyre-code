@@ -351,9 +351,9 @@ class SpinMeasurements:
             # Count.waitUntilFinished()
             # Push ([Time], [Count])
             gw.daq.free_time_tagger()
-            
-    
-    def sigvstime_run(self, sampling_rate: float):
+
+
+    def sigvstime_run(self, sampling_rate: float, **kwargs):
         '''
         Developed by Tian-Xing in Sept.2023
         '''
@@ -375,9 +375,18 @@ class SpinMeasurements:
             t_StreamingList = StreamingList([])
             PL_t_StreamingList = StreamingList([])
           
-            sampling_time = (1/sampling_rate)*1e12 # period defining sig vs time sampling rate
+            sampling_time = int((1/sampling_rate)*1e12) # period defining sig vs time sampling rate
             # gw.ps.sampling_time = 1/sampling_rate * 1e9 # period defining sig vs time sampling rate
             #gw.ps.clock_time = clock_time #* 1e9 #width of our clock pulse.
+
+            # Turn on the laser
+            gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['laser_power']) # set laser power to 10%
+            gw.laser.on()
+
+            # Enable Laser and SPCM with Pulse Streamer
+            gw.ps.spcm_laser_on()
             
             """"
             Mod. with function from TT driver (A.K.)
@@ -407,11 +416,20 @@ class SpinMeasurements:
                 #print("TIME END LOOP = ", time.time() - time_start)
                 
                 if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                    gw.laser.set_power(0)
                     gw.laser.off()
+                    gw.ps.constant_off()
+                    gw.ps.ps_reset()
                     print('the GUI has asked us nicely to exit')
                     return
 
-            gw.daq.free_time_tagger()
+            # Free sources and turn off the laser, SPCM
+            gw.laser.set_power(0)
+            gw.laser.get_power()
+            gw.laser.off()   
+            gw.ps.constant_off()
+            gw.ps.ps_reset()
+            #gw.daq.free_time_tagger()
 
     def cal_lag_run(self, **kwargs):
 
@@ -777,7 +795,8 @@ class SpinMeasurements:
             # We define parameters 
             dwell_time = int(kwargs['dwell_time']*1e9) # in nanoseconds
             n_bins = 10
-            bin_width = int(dwell_time/n_bins) # in ms
+            bin_width = int(dwell_time/n_bins) # in ns
+            
 
             # Set laser
             gw.laser.cw_mode()
@@ -812,8 +831,8 @@ class SpinMeasurements:
             gw.sg.set_rf_amplitude(kwargs['mw_power'])
             gw.sg.set_mod_type(6) # 'IQ' modulation : 6
             gw.sg.set_qmod_function(5) # 'IQ modulation function': External
-            gw.sg.set_mod_toggle(1)
-            gw.sg.set_rf_toggle(1)            
+            gw.sg.set_mod_toggle(1) # Modulation ON
+            gw.sg.set_rf_toggle(1)  # RF ON
 
             sig_a = np.zeros(kwargs['num_points'])
             bg_a = np.zeros(kwargs['num_points'])
@@ -822,6 +841,7 @@ class SpinMeasurements:
                 print(f"Iteration {iter + 1} of {kwargs['iterations']}")
                 sig = []
                 bg = []
+                time.sleep(0.01)
                 for f, freq in enumerate(frequencies):
                     gw.sg.set_frequency(freq)
 
@@ -829,18 +849,20 @@ class SpinMeasurements:
                         gw.daq.start_counter([tt_spcm_ch], bin_width*1E3, n_bins)
                         n_runs = 1
                         gw.ps.stream(obtain(cw_odmr_seq), n_runs)
-                        gw.daq.sFor_Counter(int(bin_width*1E3*n_bins))  
+                        gw.daq.sFor_Counter(int(dwell_time*1E3))  # given the dwell time in ns, we convert it to ps for the Time Tagger
                         gw.daq.wait_until_counter()  
                         
-                        counter_data = gw.daq.get_counter_data()
+                        counter_data = obtain(gw.daq.get_counter_data())
                         
-                        # Record of photon counts
-                        sig.append(counter_data[0][3])
-                        bg.append(counter_data[0][6])
+                        # Record of photon counts (cps)
+                        sig_cps = float(counter_data[0][3]/(bin_width*1e-9))  # cps, since bin_width is in ns, we convert it to s
+                        bg_cps = float(counter_data[0][6]/(bin_width*1e-9))  # cps
+                        sig.append(sig_cps)  # cps, since bin_width is in ns, we convert it to s
+                        bg.append(bg_cps)  # cps
                         # Count verification
                         print("counter_data: ", counter_data)
-                        print("Signal counts: ", counter_data[0][3])
-                        print("Background counts: ", counter_data[0][6])
+                        print(f"Signal counts (cps): {sig_cps:.3f}")
+                        print(f"Background counts (cps): {bg_cps:.3f}")
 
                     elif kwargs['odmr_type'] == 'Pulsed':
                         runs = 1000
@@ -851,14 +873,22 @@ class SpinMeasurements:
                         ready = False
                         while ready is False:
                             ready = gw.daq.cbm_ready()
-                            counts = gw.daq.count_BM()
+                            counts = obtain(gw.daq.count_BM())
+                        
+                        counts = np.asarray(counts, dtype=float)
+
+                        # cps
+                        read_time_s = float(kwargs['read_time'])
+                        sig_cps = counts[0::2].sum() / (read_time_s * runs)  # cps
+                        bg_cps = counts[1::2].sum() / (read_time_s * runs)  # cps
+                        
                         # Record of photon counts
-                        sig.append(sum(counts[0::2]))
-                        bg.append(sum(counts[1::2]))
-                
+                        sig.append(sig_cps)  # cps
+                        bg.append(bg_cps)  # cps
+
                 # avg_data = (avg_data*iter + np.array(signal_sweeps))/(iter+1)
-                sig_a = (sig_a*iter + np.array([float(x) for x in sig]))/(iter+1)
-                bg_a = (bg_a*iter + np.array([float(x) for x in bg]))/(iter+1)
+                sig_a = (sig_a*iter + np.array(sig))/(iter+1) #sig_a = (sig_a*iter + np.array([float(x) for x in sig]))/(iter+1)
+                bg_a = (bg_a*iter + np.array(bg))/(iter+1)
 
                 signal_sweeps.append(np.stack([frequencies/1e9, sig_a]))
                 background_sweeps.append(np.stack([frequencies/1e9, bg_a]))
@@ -905,7 +935,7 @@ class SpinMeasurements:
         #gw.ps.constant(OutputState([], 0.0, 0.0))
         gw.ps.constant_off()
         gw.ps.ps_reset()
-        gw.daq.free_time_tagger()
+        #gw.daq.free_time_tagger()
 
 
     #ODMR_2Dsweeping
@@ -1910,20 +1940,20 @@ class SpinMeasurements:
                 forward_counts.append(obtain(counts_forward))
                 time.sleep(0.2)
                 # Move backwards
-                #gw.nano.wfma_setup(axis1_backward, None, None, setup_points, dwell_time, 1, gw.nano.handle)
-                #gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
-                #gw.daq.CBM_start()
-                #gw.daq.sync()
-                #gw.nano.wfma_trigger(gw.nano.handle)
-                #ready = False
-                #while ready is False:
-                #    ready = gw.daq.cbm_ready()
-                #    counts_backward = gw.daq.count_BM()
-                #gw.daq.cbm_clear()
-                #counts_backward = counts_backward[::-1] # Reverse backward counts to match forward scan direction
-                #backward_counts.append(obtain(counts_backward))
-                #avg_counts = np.mean([counts_forward, counts_backward], axis=0).astype(int)
-                #averaged_counts.append(avg_counts)
+                gw.nano.wfma_setup(axis1_backward, None, None, setup_points, dwell_time, 1, gw.nano.handle)
+                gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
+                gw.daq.CBM_start()
+                gw.daq.sync()
+                gw.nano.wfma_trigger(gw.nano.handle)
+                ready = False
+                while ready is False:
+                    ready = gw.daq.cbm_ready()
+                    counts_backward = gw.daq.count_BM()
+                gw.daq.cbm_clear()
+                counts_backward = counts_backward[::-1] # Reverse backward counts to match forward scan direction
+                backward_counts.append(obtain(counts_backward))
+                avg_counts = np.mean([counts_forward, counts_backward], axis=0).astype(int)
+                averaged_counts.append(avg_counts)
                 # Move in axis 2
                 if index_axis2 + 1 < len(axis2):
                     gw.nano.single_write_n(axis2[index_axis2 + 1], scanned_axis2, gw.nano.handle)
