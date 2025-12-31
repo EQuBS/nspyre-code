@@ -392,7 +392,7 @@ class SpinMeasurements:
             Mod. with function from TT driver (A.K.)
             """
             #gw.daq.open_task(n_runs) # one clock per each of the "n_runs" no. of sequences
-            gw.daq.set_trigger_level(3, 1.1)
+            gw.daq.set_trigger_level(7, 1.1)
 
             time_start = time.time()
             print("TIME 0 = ", time.time() - time_start)
@@ -791,6 +791,7 @@ class SpinMeasurements:
             
             signal_sweeps = StreamingList()
             background_sweeps = StreamingList()
+            norm_sweeps = StreamingList()
 
             # We define parameters 
             dwell_time = int(kwargs['dwell_time']*1e9) # in nanoseconds
@@ -892,7 +893,7 @@ class SpinMeasurements:
 
                 signal_sweeps.append(np.stack([frequencies/1e9, sig_a]))
                 background_sweeps.append(np.stack([frequencies/1e9, bg_a]))
-
+                norm_sweeps.append(np.stack([frequencies/1e9, (sig_a - bg_a)/bg_a]))
                 # To use... RAFG 9/29/2025
                 # signal_sweeps.append(np.stack([frequencies/1e9, sig_a]))
                 # background_sweeps.append(np.stack([frequencies/1e9, bg_a]))
@@ -900,6 +901,7 @@ class SpinMeasurements:
                 # Notify the streamlist, and update it
                 signal_sweeps.updated_item(-1)
                 background_sweeps.updated_item(-1)
+                norm_sweeps.updated_item(-1)
 
                 if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
                     #gw.daq.free_time_tagger()
@@ -915,7 +917,7 @@ class SpinMeasurements:
                     print('the GUI has asked us nicely to exit')
                     return
 
-
+                
                 # Data push 
                 odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
                                     'title': 'Optically Detected Magnetic Resonance',
@@ -923,6 +925,7 @@ class SpinMeasurements:
                                     'ylabel': 'Counts',
                                     'datasets': {'signal' : signal_sweeps,
                                                 'background': background_sweeps,
+                                                'norm' : norm_sweeps
                                                 } #'frequencies': frequencies
                         })
 

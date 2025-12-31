@@ -196,6 +196,7 @@ def process_ODMR_data(sink: DataSink):
     diff_sweeps = []
     div_sweeps = []
     divnow_sweeps = []
+    norm_sweeps = [] #create normalization plot -A.K 11/19/2025
     for s,_ in enumerate(sink.datasets['signal']):
         freqs = sink.datasets['signal'][s][0]
         sig = sink.datasets['signal'][s][1]
@@ -205,12 +206,16 @@ def process_ODMR_data(sink: DataSink):
         # sig[sig == 0] = np.nan
         bg[bg == 0] = np.nan
 
-        diff_sweeps.append(np.stack([freqs/1E9, sig - bg]))
-        div_sweeps.append(np.stack([freqs/1E9, sig/bg]))
+        diff_sweeps.append(np.stack([freqs, sig - bg]))
+        div_sweeps.append(np.stack([freqs, sig/bg]))
+
+        norm_sweeps.append(np.stack([freqs, (sig-bg)/bg]))
         #divnow_sweeps.append(np.stack([freqs, np.mean(sink.datasets['signal'][:s][1],axis=0)/np.mean(sink.datasets['background'][:s][1],axis=0)]))
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['div'] = div_sweeps
     sink.datasets['div_now'] = divnow_sweeps
+    sink.datasets['norm'] = norm_sweeps
+    #print("FF")
 
 class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""
@@ -219,6 +224,8 @@ class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
         # create some default average plots
         self.add_plot('sig_avg',        series='signal',   scan_i='',     scan_j='',  processing='Average')
         self.add_plot('bg_avg',         series='background',   scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('norm_avg',       series='norm',  scan_i='',      scan_j='',  processing='Average') # add normalized plot to main plots -A.K 11/19/2025
+
         self.add_plot('div_avg',       series='div',  scan_i='',      scan_j='',  processing='Average')
         self.hide_plot('div_avg')
         self.add_plot('div_now',       series='div_now',  scan_i='-1',      scan_j='',  processing='Average')
@@ -242,6 +249,9 @@ class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
         
         self.add_plot('div_latest',    series='div',  scan_i='-1',    scan_j='',  processing='Average')
         self.hide_plot('div_latest')
+
+        self.add_plot('norm_latest',    series='norm',  scan_i='-1',    scan_j='',  processing='Average')
+        self.hide_plot('norm_latest')
         # manually set the XY range
         #self.line_plot.plot_item().setXRange(3.0, 4.0)
         #self.line_plot.plot_item().setYRange(-3000, 4500)

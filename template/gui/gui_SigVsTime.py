@@ -90,6 +90,15 @@ def process_SigVsTime_data(sink: DataSink):
     # sink.datasets['diff'] = diff_sweeps
     # pass
 
+    sig = sink.datasets['SigVsT_data']
+
+    new_sig = [0]*200
+    
+    for i in range(len(sig)):
+        new_sig[i%200] = sig[i]
+
+    sink.datasets['refresh'] = new_sig
+
 class FlexLinePlotWidgetWithSigVsTime(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""
     def __init__(self):
