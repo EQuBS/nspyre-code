@@ -35,8 +35,10 @@ import template.gui.gui_Scan
 import template.gui.gui_ScanXZ
 import template.gui.gui_ODMR
 import template.gui.gui_Rabi
+import template.gui.gui_new_2D_Scan
 import template.gui.spin_measurements as sm
 from template.drivers.TimeTaggerDriver import tt20
+
 
 #print(template.gui.spin_measurements.__file__)
 
@@ -96,6 +98,7 @@ def main():
                 'Nano Stage': MainWidgetItem(template.gui.gui_Nano, 'NanoWidget', args=[nano], stretch=(1, 1)),
                 'Scan': MainWidgetItem(template.gui.gui_Scan, 'ScanWidget', args=[nano, laser_driver, pulse_streamer_driver, tagger], stretch=(1, 1)), # Scan widget not created yet. 6/23/2025
                 '2D-Scan': MainWidgetItem(template.gui.gui_2D_Scan, 'TwoD_Scan', stretch=(1, 1)),
+                'test(2D Scan)': MainWidgetItem(template.gui.gui_new_2D_Scan, 'TwoD_Scan', stretch=(1, 1)),
                 'XZ-Scan': MainWidgetItem(template.gui.gui_ScanXZ, 'ScanXZ', stretch=(1, 1)),
                 'ODMR': MainWidgetItem(template.gui.gui_ODMR, 'ODMR_Widget', args=[pulse_streamer_driver], stretch=(1, 1)),
                 'Rabi': MainWidgetItem(template.gui.gui_Rabi, 'RabiWidget', stretch=(1, 1)),
@@ -120,6 +123,11 @@ def main():
                         'ScanPlotWidget',
                         stretch=(100, 100),
                     ),
+                    'test_ScanPlot': MainWidgetItem(
+                        template.gui.gui_new_2D_Scan,
+                        'ScanPlotWidget',
+                        stretch=(100, 100),
+                    ),
                     'ODMRPlot': MainWidgetItem(
                         template.gui.gui_ODMR,
                         'FlexLinePlotWidgetWithODMR',
@@ -128,6 +136,11 @@ def main():
                     'RabiPlot': MainWidgetItem(
                         template.gui.gui_Rabi,
                         'FlexLinePlotWidgetWithRabi',
+                        stretch=(100, 100),
+                    ),
+                    'T1Plot': MainWidgetItem(
+                        template.gui.gui_T1,
+                        'FlexLinePlotWidgetWithT1',
                         stretch=(100, 100),
                     ),
                 },

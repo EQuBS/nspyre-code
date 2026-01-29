@@ -104,7 +104,7 @@ class NanoWidget(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel('X Step Size (um)'), layout_row, 0)
         self.x_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
         self.x_step_size_spinbox.setFixedSize(120, 30)
-        self.x_step_size_spinbox.setValue(value=0)
+        self.x_step_size_spinbox.setValue(value=0.05)
         layout.addWidget(self.x_step_size_spinbox, layout_row, 1)
  
         plus_xbutton = QtWidgets.QPushButton('+')
@@ -150,7 +150,7 @@ class NanoWidget(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel('Y Step Size (um)'), layout_row, 0)
         self.y_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
         self.y_step_size_spinbox.setFixedSize(120, 30)
-        self.y_step_size_spinbox.setValue(value=0)
+        self.y_step_size_spinbox.setValue(value=0.05)
         layout.addWidget(self.y_step_size_spinbox, layout_row, 1)
 
         plus_ybutton = QtWidgets.QPushButton('+')
@@ -195,7 +195,7 @@ class NanoWidget(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel('Z Step Size (um)'), layout_row, 0)
         self.z_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
         self.z_step_size_spinbox.setFixedSize(120, 30)
-        self.z_step_size_spinbox.setValue(value=0)
+        self.z_step_size_spinbox.setValue(value=0.05)
         layout.addWidget(self.z_step_size_spinbox, layout_row, 1)
 
         plus_zbutton = QtWidgets.QPushButton('+')

@@ -26,10 +26,22 @@ class tt20:
     # - n_values: number of bins to store
     # - measurement_duration: duration of the measurement in ps
     def start_counter(self, channels, binwidth, n_values, tagger=None): # Test took measurement duration
+        """
+        Initializes a counter measurement.
+
+        Args:
+            channels (list): List of channels to measure.
+            binwidth (int): Width of each bin in ps.
+            n_values (int): Number of bins to store.
+            tagger (TimeTagger, optional): TimeTagger object or tag_proxy. Defaults to self.tagger.
+        """
         if tagger is None:
             tagger = self.tagger
+        #elif tagger == 'synchro':
+            #tagger = self.synchro()
         try:
             self.counter = tt.Counter(tagger, channels=channels, binwidth=binwidth, n_values=n_values)
+            print("Counter properly initialized")
         except Exception as e:
             if not isinstance(channels, list) or not all(isinstance(ch, int) for ch in channels):
                 raise ValueError("Channels must be a list of integers.")
@@ -39,7 +51,7 @@ class tt20:
                 raise ValueError("N_values must be a positive integer.")
             print(f"Error initializing Counter: {e}")
             try:
-                print(f"Tagger: {self.tagger}")
+                print(f"Tagger: {tagger}")
                 print("Tagger properly initialized")
             except Exception as e:
                 print(f"Error accessing tagger: {e}")
@@ -122,6 +134,10 @@ class tt20:
 
     def cbm_clear(self):
         self.cbm.clear()
+
+    def cbm_get_BinWidths(self):
+        BinWidths = self.cbm.getBinWidths()
+        return obtain(BinWidths)
 
     #Counts between marked events, introd. 6/27/2025 by Rolando
     def count_BM(self):

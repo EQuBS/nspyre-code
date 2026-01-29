@@ -29,6 +29,7 @@ class PS82():
         self.clock_time = 10
         self.sampling_time = 50000
         self.laser_lag = 130
+        self.singlet_decay = 600
         self.MW_buffer_time = 200
         self.readout_time = 400
         self.total_time = 0 #update when a pulse sequence is streamed 
@@ -41,15 +42,51 @@ class PS82():
         self.IQ0 = [0.0098, 0.0010]
         self.IQ = self.IQ0
 
-        self.IQpx = [0.497, 0.001]
-        self.IQnx = [-0.479, 0.001]
+        # 2026-1-7, changed by Rolando to check for Ext Modulation Oveload issue in Signal Gen., Previous values on OneNote 'Signal Generator External Modulation overload'
+        self.IQpx = [0.470, 0.080]
+        self.IQnx = [-0.474, 0.080]
 
-        self.IQpy = [0.0098, 0.482]
-        self.IQny = [0.0098, -0.481]
+        self.IQpy = [0.0795, 0.470]
+        self.IQny = [0.0795, -0.473]
 
             # Here, we force the type of time parameters to be an int type in python
     # All times variables here are in unit of ns
     _T = t.TypeVar('_T')
+
+    def PiHalf(self, axis, pi_half_time):
+        iq_on = pi_half_time
+        
+        if axis in ["X","x"]:
+            mw_I_on = (iq_on, self.IQpx[0])
+            mw_Q_on = (iq_on, self.IQpx[1])
+        elif axis in ["-X","-x"]:
+            mw_I_on = (iq_on, self.IQnx[0])
+            mw_Q_on = (iq_on, self.IQnx[1])
+        elif axis in ["Y","y"]:
+            mw_I_on = (iq_on, self.IQpy[0])
+            mw_Q_on = (iq_on, self.IQpy[1])
+        elif axis in ["-Y","-y"]:
+            mw_I_on = (iq_on, self.IQny[0])
+            mw_Q_on = (iq_on, self.IQny[1])
+        
+        return mw_I_on, mw_Q_on
+        
+    def Pi(self, axis, pi_time):
+        iq_on = pi_time
+        if axis in ["X","x"]:
+            mw_I_on = (iq_on, self.IQpx[0])
+            mw_Q_on = (iq_on, self.IQpx[1])
+        elif axis in ["-X","-x"]:
+            mw_I_on = (iq_on, self.IQnx[0])
+            mw_Q_on = (iq_on, self.IQnx[1])
+        elif axis in ["Y","y"]:
+            mw_I_on = (iq_on, self.IQpy[0])
+            mw_Q_on = (iq_on, self.IQpy[1])
+        elif axis in ["-Y","-y"]:
+            mw_I_on = (iq_on, self.IQny[0])
+            mw_Q_on = (iq_on, self.IQny[1])
+        
+        return mw_I_on, mw_Q_on
 
     def create_sequence(self):
         return self.ps.createSequence()
@@ -423,6 +460,25 @@ class PS82():
     """ def cw_seq_duration(self, seq_on):
         return seq_on.getDuration() """
 
+    def New_CW_ODMR_R(self, dwell_time, runs):
+    
+        cw_seq = self.ps.createSequence()
+        #seq_off = self.ps.createSequence()
+        
+        laser_patt = [(dwell_time, 1)]*runs
+        spcm_patt = [(dwell_time, 1)]*runs
+        mw_I_patt = [(int(dwell_time/2), self.IQpx[0]), (int(dwell_time/2), self.IQ0[0])]*runs # 100 ns mw buffer time
+        mw_Q_patt = [(int(dwell_time/2), self.IQpx[1]), (int(dwell_time/2), self.IQ0[1])]*runs
+        read_patt = [(int(dwell_time/2)-10, 1), (10, 0), (int(dwell_time/2)-10, 1), (10, 0)]*runs
+
+        cw_seq.setDigital(self.channel_r['laser'], laser_patt)
+        cw_seq.setDigital(self.channel_r['spcm_gate'], spcm_patt)
+        cw_seq.setDigital(self.channel_r['vrt_gate'], read_patt)
+        cw_seq.setAnalog(0, mw_I_patt)
+        cw_seq.setAnalog(1, mw_Q_patt)
+
+        return cw_seq
+
     def Pulsed_ODMR_R(self, init_time, wait_time, pi_xy, probe_time, read_wait, read_time):
         # Seq. objects for on and off
         laser_lag = self.laser_lag
@@ -659,6 +715,303 @@ class PS82():
         single_rabi.setAnalog(1, mw_Q_patt)
 
         return single_rabi
+
+    def Diff_T1_R(self, params, tau_balance, pi_xy, pi_time, init_time, read_time, seq_gap):#the wait time here is used to replace the self.singlet_decay
+        '''
+        Rolando's adaptation of Tian-Xing Zheng's Differential T1 sequence
+        1/19/2026
+        MW (differential) T1 sequence with integrator
+        '''
+        ## Run a pi pulse, then measure the signal
+        ## and reference counts from NV.
+        self.laser_time = init_time
+        self.readout_time = read_time
+        longest_time = self.convert_type(round(max(params)), float)
+        pi_time = self.convert_type(round(pi_time), float)
+
+        ## we can measure the pi time on x and on y.
+        ## they should be the same, but they technically
+        ## have different offsets on our pulse streamer.
+
+        def SingleDiff_T1(tau_time, tau_balance):
+            '''
+            CREATE SINGLE T1 SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
+            '''
+
+            tau_time = self.convert_type(round(tau_time), float) # convert to proper data type to avoid undesired rpyc netref data type
+
+            '''
+            DEFINE SPECIAL TIME INTERVALS FOR EXPERIMENT
+            '''
+            # padding time to equalize duration of every run
+            pad_time = longest_time - tau_time 
+
+            '''
+            DEFINE RELEVANT ON, OFF TIMES FOR DEVICES
+            '''
+            init_laser_time = self.laser_time
+            laser_off1 = self.singlet_decay + pi_time + tau_time
+            #laser_off1 = wait_time + pi_time + tau_time
+            if tau_balance:
+                laser_off2 = 200 + seq_gap
+            else:
+                laser_off2 = 200 + pad_time + seq_gap
+            self.total_time = init_laser_time + laser_off1 + self.readout_time + laser_off2
+
+            #(DAQ trigger) to be Time tagger windows
+            read_off1 = init_laser_time + laser_off1 + self.laser_lag
+            read_readout = self.readout_time 
+            read_off2 = laser_off2 - self.laser_lag
+
+            # mw I & Q off windows
+            iq_off1 = init_laser_time + self.singlet_decay + self.laser_lag
+            #iq_off1 = init_laser_time + wait_time + self.laser_lag
+            iq_off2 = tau_time + self.readout_time + laser_off2 - self.laser_lag
+
+            '''
+            CONSTRUCT PULSE SEQUENCE
+            '''
+            # create sequence objects for MW on and off blocks
+            seq_on = self.ps.createSequence()
+            seq_off = self.ps.createSequence()
+
+            # define sequence for spcm gate
+            spcm_gate = [(self.total_time, 1)]
+
+            # define sequence structure for laser
+            laser_seq = [(init_laser_time, 1), (laser_off1, 0), (self.readout_time, 1), (laser_off2, 0)]
+
+            # define sequence structure for TimeTagger (CBM) trigger
+            readout_trig_seq = [(read_off1, 0), (read_readout, 1), (read_off2, 0)]
+
+            # define sequence structure for MW I and Q when MW = ON
+            mw_I_on_seq = [(iq_off1, self.IQ0[0]), self.Pi(pi_xy, pi_time)[0], (iq_off2, self.IQ0[0])]
+            mw_Q_on_seq = [(iq_off1, self.IQ0[1]), self.Pi(pi_xy, pi_time)[1], (iq_off2, self.IQ0[1])]
+            # when MW = OFF
+            mw_I_off_seq = [(iq_off1, self.IQ0[0]), (pi_time, self.IQ0[0]), (iq_off2, self.IQ0[0])]
+            mw_Q_off_seq = [(iq_off1, self.IQ0[1]), (pi_time, self.IQ0[1]), (iq_off2, self.IQ0[1])]
+
+            # assign sequences to respective channels for seq_on
+            seq_on.setDigital(self.channel_r["spcm_gate"], spcm_gate) # spcm gate
+            seq_on.setDigital(self.channel_r["laser"], laser_seq) # laser
+            seq_on.setDigital(self.channel_r["vrt_gate"], readout_trig_seq) # integrator trigger
+            seq_on.setAnalog(0, mw_I_on_seq) # mw_I
+            seq_on.setAnalog(1, mw_Q_on_seq) # mw_Q
+
+            # assign sequences to respective channels for seq_off
+            seq_off.setDigital(self.channel_r["spcm_gate"], spcm_gate) # spcm gate   
+            seq_off.setDigital(self.channel_r["laser"], laser_seq) # laser
+            seq_off.setDigital(self.channel_r["vrt_gate"], readout_trig_seq) # integrator trigger
+            seq_off.setAnalog(0, mw_I_off_seq) # mw_I
+            seq_off.setAnalog(1, mw_Q_off_seq) # mw_Q
+
+            return seq_on + seq_off
+
+        seqs = self.ps.createSequence()
+            
+        seqs_total_time = 0
+        for tau in params:
+            seqs += SingleDiff_T1(tau, tau_balance)
+            seqs_total_time += 2*self.total_time
+        print('Diff T1 sequence created!')
+        print('sequence time for 1 run is (ns):', seqs_total_time)
+
+        return seqs
+    
+    def Diff_T1rho_R(self, params, tau_balance, pihalf_y, init_time, read_time, seq_gap):
+        '''
+        By Rolando 1/19/2026
+        Adaptation of Tian-Xing Zheng's Differential T1rho sequence
+
+        -(Developed by Tian-Xing Zheng, Aug.2024
+        MW (differential) T1_rho sequence 
+        pi/2(y)- MW(x-axis for tau) - pi/2(y, -y)
+        '''
+        ## Run a pi pulse, then measure the signal
+        ## and reference counts from NV.
+        self.laser_time = init_time
+        self.readout_time = read_time
+        longest_time = self.convert_type(round(max(params)), float)
+        #pihalf_x = self.convert_type(round(pihalf_x), float)
+        pihalf_y = self.convert_type(round(pihalf_y), float)
+        #pi_x = self.convert_type(round(pi_x), float)
+        #pi_y = self.convert_type(round(pi_y), float)
+
+        ## we can measure the pi time on x and on y.
+        ## they should be the same, but they technically
+        ## have different offsets on our pulse streamer.
+
+        def SingleDiff_T1rho(tau_time, tau_balance):
+            '''
+            CREATE SINGLE T1 SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
+            '''
+
+            tau_time = self.convert_type(round(tau_time), float) # convert to proper data type to avoid undesired rpyc netref data type
+
+            '''
+            DEFINE SPECIAL TIME INTERVALS FOR EXPERIMENT
+            '''
+            # padding time to equalize duration of every run
+            pad_time = longest_time - tau_time 
+
+            '''
+            DEFINE RELEVANT ON, OFF TIMES FOR DEVICES
+            '''
+            init_laser_time = self.laser_time
+            laser_off1 = self.singlet_decay + pihalf_y + tau_time + pihalf_y + self.MW_buffer_time
+            if tau_balance:
+                laser_off2 = 200 + seq_gap
+            else:
+                laser_off2 = 200 + pad_time + seq_gap
+            self.total_time = init_laser_time + laser_off1 + self.readout_time + laser_off2
+
+
+            #(DAQ trigger) to be Time tagger windows
+            read_off1 = init_laser_time + laser_off1 + self.laser_lag
+            read_readout = self.readout_time 
+            read_off2 = laser_off2 - self.laser_lag
+
+            # mw I & Q off windows
+            iq_off1 = self.laser_lag + init_laser_time + self.singlet_decay
+            iq_off2 = self.MW_buffer_time + self.readout_time + laser_off2 - self.singlet_decay
+
+            '''
+            CONSTRUCT PULSE SEQUENCE
+            '''
+            # create sequence objects for MW on and off blocks
+            seq = self.ps.createSequence()
+            seq_ref = self.ps.createSequence()
+
+            # define sequence for spcm gate
+            spcm_gate = [(self.total_time, 1)]
+
+            # define sequence structure for laser
+            laser_seq = [(init_laser_time, 1), (laser_off1, 0), (self.readout_time, 1), (laser_off2, 0)]
+
+            # define sequence structure for DAQ trigger
+            daq_clock_seq = [(read_off1, 0), (read_readout, 1), (read_off2, 0)]
+
+            # define sequence structure for MW I and Q 
+            mw_I_seq = [(iq_off1, self.IQ0[0]), self.PiHalf('y', pihalf_y)[0], self.PiHalf('x', tau_time)[0], self.PiHalf('y', pihalf_y)[0], (iq_off2, self.IQ0[0])]
+            mw_Q_seq = [(iq_off1, self.IQ0[1]), self.PiHalf('y', pihalf_y)[1], self.PiHalf('x', tau_time)[1], self.PiHalf('y', pihalf_y)[1], (iq_off2, self.IQ0[1])]
+            
+            mw_I_seq_ref = [(iq_off1, self.IQ0[0]), self.PiHalf('y', pihalf_y)[0], self.PiHalf('x', tau_time)[0], self.PiHalf('-y', pihalf_y)[0], (iq_off2, self.IQ0[0])]
+            mw_Q_seq_ref = [(iq_off1, self.IQ0[1]), self.PiHalf('y', pihalf_y)[1], self.PiHalf('x', tau_time)[1], self.PiHalf('-y', pihalf_y)[1], (iq_off2, self.IQ0[1])]
+
+            # assign sequences to respective channels for seq_on
+            seq.setDigital(self.channel_r["spcm_gate"], spcm_gate) # spcm gate
+            seq.setDigital(self.channel_r["laser"], laser_seq) # laser
+            seq.setDigital(self.channel_r["vrt_gate"], daq_clock_seq) # integrator trigger
+            seq.setAnalog(0, mw_I_seq) # mw_I
+            seq.setAnalog(1, mw_Q_seq) # mw_Q
+
+            # assign sequences to respective channels for seq_off
+            seq_ref.setDigital(self.channel_r["spcm_gate"], spcm_gate) # spcm gate
+            seq_ref.setDigital(self.channel_r["laser"], laser_seq) # laser
+            seq_ref.setDigital(self.channel_r["vrt_gate"], daq_clock_seq) # integrator trigger
+            seq_ref.setAnalog(0, mw_I_seq_ref) # mw_I
+            seq_ref.setAnalog(1, mw_Q_seq_ref) # mw_Q
+
+            return seq + seq_ref
+
+        seqs = self.ps.createSequence()
+        
+        seqs_total_time = 0
+        for tau in params:
+            seqs += SingleDiff_T1rho(tau, tau_balance)
+            seqs_total_time += 2*self.total_time
+        print('Diff T1_rho sequence created!')
+        print('sequence time for 1 run is (ns):', seqs_total_time)
+
+        return seqs
+
+    def Optical_T1_R(self, params, tau_balance, init_time, read_time, seq_gap ,forNV=True):
+        '''
+        By Rolando A. Fimbres G. 1/19/2026, modification of Tian-Xing Zheng's Optical T1 sequence:
+
+        - Optical T1 sequence with integrator
+        (By Tian-Xing Zheng and Tengyang Ruan Sept.2024. Modified from Evan's code)
+        "seq_gap": for sample to relax and reinitialize. Its also helpful for the DAQ speed issue
+        '''
+        self.laser_time = init_time
+        self.readout_time = read_time
+        longest_time = self.convert_type(round(max(params)), float)
+        print("LONGEST T1 time to plot: ", longest_time)
+        ## we can measure the pi time on x and on y.
+        ## they should be the same, but they technically
+        ## have different offsets on our pulse streamer.
+
+        def SingleOptical_T1(tau_time, tau_balance, seq_gap, forNV=True):
+            '''
+            CREATE SINGLE T1 SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
+            '''
+
+            tau_time = self.convert_type(round(tau_time), float) # convert to proper data type to avoid undesired rpyc netref data type
+
+            '''
+            DEFINE SPECIAL TIME INTERVALS FOR EXPERIMENT
+            '''
+            # padding time to equalize duration of every run
+            pad_time = longest_time - tau_time 
+
+            '''
+            DEFINE RELEVANT ON, OFF TIMES FOR DEVICES
+            '''
+            init_laser_time = self.laser_time
+            if forNV is True:
+                # The optical T1 sequence is for measuring NV and we need to add the singlet_decay time
+                laser_off1 = self.singlet_decay + tau_time
+                
+            else:
+                # Optical T1 sequence for all fluorescence molecules/spin defects, only wait for \tau
+                laser_off1 = tau_time
+
+            if tau_balance:
+                laser_off2 = 200 + pad_time + seq_gap
+            else:
+                laser_off2 = 200 + seq_gap
+            self.total_time = init_laser_time + laser_off1 + self.readout_time + laser_off2
+
+            #(DAQ trigger) to be Time tagger windows
+            read_off1 = init_laser_time + laser_off1 + self.laser_lag
+            read_readout = self.readout_time 
+            read_off2 = laser_off2 - self.laser_lag
+
+            '''
+            CONSTRUCT PULSE SEQUENCE
+            '''
+            # define sequence for spcm gate
+            spcm_gate = [(self.total_time, 1)]
+
+            # create sequence objects
+            seq = self.ps.createSequence()
+
+            # define sequence structure for laser
+            laser_seq = [(init_laser_time, 1), (laser_off1, 0), (self.readout_time, 1), (laser_off2, 0)]
+
+            # define sequence structure for TimeTagger (CBM) trigger
+            readout_trig_seq = [(read_off1, 0), (read_readout, 1), (read_off2, 0)]
+
+            # print("LASER SEQ: ", laser_seq)
+
+            # assign sequences to respective channels for seq_on
+            seq.setDigital(self.channel_r["spcm_gate"], spcm_gate) # spcm gate
+            seq.setDigital(self.channel_r["laser"], laser_seq) # laser
+            seq.setDigital(self.channel_r["vrt_gate"], readout_trig_seq) # integrator trigger            
+
+            return seq 
+
+        seqs = self.ps.createSequence()
+        seqs_total_time = 0
+        for tau in params:
+            seqs += SingleOptical_T1(tau, tau_balance, seq_gap, forNV)
+            seqs_total_time += 1*self.total_time
+
+        print('Optical T1 sequence created!')
+        print('sequence time for 1 run is (ns):', seqs_total_time)
+
+        return seqs
+
 
     def T1_R(self, pi_dur, tau_times, pi_xy, init_time, read_time, wait_time):
         '''

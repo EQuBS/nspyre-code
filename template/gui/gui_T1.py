@@ -160,6 +160,16 @@ class T1Widget(ExperimentWidget):
                 ),
             },
 
+            'seq_gap': {
+                'display_text': 'Seq. Gap: ',
+                'widget': SpinBox(
+                    value=0,
+                    suffix='s',
+                    siPrefix=True,
+                    bounds=(0, None),
+                ),
+            },
+
             'seq': {
                 'display_text': 'sequence',
                 'widget': QtWidgets.QLineEdit("Optical T1 General"),
@@ -174,7 +184,7 @@ class T1Widget(ExperimentWidget):
         super().__init__(params_config,
                          sm,
                          'SpinMeasurements',
-                         'T1_run',
+                         'T1_run_R2',
                          title='T1')
 
 

@@ -153,15 +153,6 @@ class ODMR_Widget(ExperimentWidget):
                 'display_text': 'X or Y pulse?',
                 'widget': QtWidgets.QLineEdit("x"),
             },
-            'pi_time': {
-                'display_text': 'pi_time: ',
-                'widget': SpinBox(
-                    value = 10e-9,
-                    suffix = 's',
-                    siPrefix = True,
-                    bounds = (0, None),
-                ),
-            },
             'dataset': {
                 'display_text': 'Data Set',
                 'widget': QtWidgets.QLineEdit('ODMR'),

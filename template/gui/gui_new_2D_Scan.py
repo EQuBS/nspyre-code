@@ -1,5 +1,5 @@
 """
-Rolando A. Fimbres Grijalva 10/29/2025
+Rolando A. Fimbres Grijalva 1/26/2026
 
 Scanning procedure based on the Safe-Scan approach (dir. XieLab_Scripts). 
 
@@ -20,9 +20,9 @@ from . import spin_measurements as sm
 class TwoD_Scan(ExperimentWidget):
     def __init__(self):
         # Parameters for 2D Scan
-        #self.pixel_resolution_label = QtWidgets.QLabel("Pixel Resolution: N/A")  # Label to display pixel resolution
+        self.pixel_resolution_label = QtWidgets.QLabel("Pixel Resolution: N/A")  # Label to display pixel resolution
 
-        params_config = {
+        self.params_config = {
             # add three checkboxes
             'Select X': {
                 'display_text': 'Enable X',
@@ -113,28 +113,28 @@ class TwoD_Scan(ExperimentWidget):
                     dec = True,
                     ),
             },
-            #'Pixel_Resolution': {
-            #    'display_text': 'Pixel Resolution',
-            #    'widget': self.pixel_resolution_label,  # Add the QLabel to display pixel resolution
-            #},
+            'Pixel_Sizw': {
+                'display_text': 'Pixel Size (µm): ',
+                'widget': self.pixel_resolution_label,  # Add the QLabel to display pixel resolution
+            },
         }
 
-        super().__init__(params_config,
+        super().__init__(self.params_config,
                          sm,
                          'SpinMeasurements',
                          'Two_D_Scan_R',
                          title='2D_Scan')
         
-        """ # Connect signals to update pixel resolution
+        # Connect signals to update pixel resolution
         self.params_config['Axis_Min_1']['widget'].valueChanged.connect(self.update_pixel_resolution)
         self.params_config['Axis_Max_1']['widget'].valueChanged.connect(self.update_pixel_resolution)
         self.params_config['Axis_Min_2']['widget'].valueChanged.connect(self.update_pixel_resolution)
         self.params_config['Axis_Max_2']['widget'].valueChanged.connect(self.update_pixel_resolution)
         self.params_config['Data_Points']['widget'].valueChanged.connect(self.update_pixel_resolution)
         # Initial calculation
-        self.update_pixel_resolution() """
+        self.update_pixel_resolution()
 
-    """ def update_pixel_resolution(self):
+    def update_pixel_resolution(self):
         # Retrieve axis ranges and data points
         axis_min_1 = self.params_config['Axis_Min_1']['widget'].value()
         axis_max_1 = self.params_config['Axis_Max_1']['widget'].value()
@@ -144,11 +144,13 @@ class TwoD_Scan(ExperimentWidget):
 
         # Calculate pixel resolution
         if data_points > 1:
-            resolution_x = (axis_max_1 - axis_min_1) / (data_points - 1)
-            resolution_y = (axis_max_2 - axis_min_2) / (data_points - 1)
-            self.pixel_resolution_label.setText(f"Pixel Resolution: {resolution_x:.3f} µm x {resolution_y:.3f} µm")
+            resolution_x = (axis_max_1 - axis_min_1) / (data_points)
+            resolution_y = (axis_max_2 - axis_min_2) / (data_points)
+            self.pixel_resolution_label.setText(f"{resolution_x:.3f} x {resolution_y:.3f}")
+            if resolution_x != resolution_y:
+                self.pixel_resolution_label.setText(f"Non-square Pixels, modify parameters.")
         else:
-            self.pixel_resolution_label.setText("Pixel Resolution: N/A") """
+            self.pixel_resolution_label.setText("Pixel Size: N/A")
 
 
 def process_2D_Scan_data(sink: DataSink):
