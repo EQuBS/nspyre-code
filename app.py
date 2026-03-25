@@ -36,8 +36,10 @@ import template.gui.gui_ScanXZ
 import template.gui.gui_ODMR
 import template.gui.gui_Rabi
 import template.gui.gui_new_2D_Scan
+import template.gui.gui_Calibrate
 import template.gui.spin_measurements as sm
 from template.drivers.TimeTaggerDriver import tt20
+import template.gui.gui_PulsedCalibration
 
 
 #print(template.gui.spin_measurements.__file__)
@@ -100,8 +102,10 @@ def main():
                 '2D-Scan': MainWidgetItem(template.gui.gui_2D_Scan, 'TwoD_Scan', stretch=(1, 1)),
                 'test(2D Scan)': MainWidgetItem(template.gui.gui_new_2D_Scan, 'TwoD_Scan', stretch=(1, 1)),
                 'XZ-Scan': MainWidgetItem(template.gui.gui_ScanXZ, 'ScanXZ', stretch=(1, 1)),
+                #'Pulsed Calibration': MainWidgetItem(template.gui.gui_PulsedCalibration, 'PulsedCalibrationWidget', args=[pulse_streamer_driver], stretch=(1, 1)),
                 'ODMR': MainWidgetItem(template.gui.gui_ODMR, 'ODMR_Widget', args=[pulse_streamer_driver], stretch=(1, 1)),
                 'Rabi': MainWidgetItem(template.gui.gui_Rabi, 'RabiWidget', stretch=(1, 1)),
+                'Calibrate': MainWidgetItem(template.gui.gui_Calibrate, 'CalibrateWidget', stretch=(1, 1)),
                 'Plots': {
                     'FlexLinePlotDemo': MainWidgetItem(
                         template.gui.elements,
@@ -116,6 +120,11 @@ def main():
                     'FlexLinePlot_SigVSTime': MainWidgetItem(
                         template.gui.gui_SigVsTime,
                         'FlexLinePlotWidgetWithSigVsTime',
+                        stretch=(100, 100),
+                    ),
+                    'Calibrate (laser lag)': MainWidgetItem(
+                        template.gui.gui_Calibrate,
+                        'FlexLinePlotWidgetWithCali',
                         stretch=(100, 100),
                     ),
                     'ScanPlot': MainWidgetItem(

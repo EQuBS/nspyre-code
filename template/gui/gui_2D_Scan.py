@@ -170,11 +170,18 @@ class ScanPlotWidget(HeatMapWidget):
         title = '2D_Scan'
         #super().__init__(title=title, btm_label='X', lft_label='Y', colormap = 0.5)
         super().__init__(title=title, btm_label='X (um)', lft_label='Y (um)', colormap = None)
+        
         # When the user clicks on the heatmap, print/log the snapped coordinates
         self.pointClicked.connect(self._on_point_clicked)
 
     def setup(self):
         self.sink = DataSink('2D_Scan')
+        #self.title = self.sink.title # Set title to dataset title
+        #self.btm_label = self.sink.xLabel # Set bottom label to dataset correct axis label
+        #self.lft_label = self.sink.yLabel # Set left label to dataset correct axis label
+        #self.title = self.sink.datasets['title'] # Set title to dataset title
+        #self.btm_label = self.sink.datasets['xLabel'] # Set bottom label to dataset correct axis label
+        #self.lft_label = self.sink.datasets['yLabel'] # Set left label to dataset correct axis label
         self.sink.__enter__()
 
 
@@ -187,6 +194,8 @@ class ScanPlotWidget(HeatMapWidget):
         self.sink.pop() #wait for some data to be saved to sink
         self.set_data(self.sink.datasets['xSteps'], self.sink.datasets['ySteps'], self.sink.datasets['Scan_Forward'])
         ######  Modification 
+        
+        ######
         self.sink.pop()
         # read arrays
         x = np.asarray(self.sink.datasets['xSteps'])

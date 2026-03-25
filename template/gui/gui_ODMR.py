@@ -65,6 +65,16 @@ class ODMR_Widget(ExperimentWidget):
                     dec=True,
                 ),
             },
+            'CW_Buffer_Time': {
+                'display_text': 'CW Buffer Time',
+                'widget': SpinBox(
+                    value = 1e-3,
+                    suffix = 's',
+                    siPrefix = True,
+                    bounds = (10e-9, None),
+                    dec=True,
+                ),
+            },
             'runs': {
                 'display_text': 'Runs (per pt.)',
                 'widget': SpinBox(
@@ -88,6 +98,7 @@ class ODMR_Widget(ExperimentWidget):
                     value = -15,
                     suffix = 'dBm',
                     siPrefix = False,
+                    bounds = (None, 4),
                 ),
             },
             'probe_time': {
@@ -96,7 +107,7 @@ class ODMR_Widget(ExperimentWidget):
                     value = 50e-9,
                     suffix = 's',
                     siPrefix = True,
-                    bounds = (10e-9, None),
+                    bounds = (2e-9, None),
                     dec=True,
                 ),
             },
@@ -144,6 +155,15 @@ class ODMR_Widget(ExperimentWidget):
                 'display_text': 'Read Wait: ',
                 'widget': SpinBox(
                     value = 350e-9,
+                    suffix = 's',
+                    siPrefix = True,
+                    bounds = (0, None),
+                ),
+            },
+            'seq_gap': {
+                'display_text': 'Seq. Gap: ',
+                'widget': SpinBox(
+                    value = 0,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),

@@ -58,8 +58,9 @@ class SpinMeasurements:
             print("DAQ TASK ERROR!")
             
         runs = int(np.ceil(runs)) # integer no. of runs
-        samp_rate = int(1e12 / sampling_time)
-        tt_data = gw.daq.get_counter_data()[0]*samp_rate # get the counter data from TT, and convert to Counts/s by multiplying with sampling rate
+        samp_rate = 1e12 / sampling_time
+        #tt_data = gw.daq.get_counter_data()[0]*samp_rate # get the counter data from TT, and convert to Counts/s by multiplying with sampling rate
+        tt_data = gw.daq.count_data_Norm()[0]
         print("tt_data: ", tt_data)
         #import pdb; pdb.set_trace()
         # convert data back to numpy array from rpyc.netref data type
@@ -68,6 +69,7 @@ class SpinMeasurements:
 
             # gw.daq.stop_task()
             #gw.ps.ps.reset() # from Pulser to ps
+        gw.daq.clear_counter()
 
         return read_out
     
@@ -107,6 +109,7 @@ class SpinMeasurements:
 
     def digital_math(self, array, exp_type, pts = 0):
         # Reshape and calculate the count from the Raw data buffer from the digital readout counter
+        array = array
         diff_array = array[1:]-array[:-1]
         if exp_type == 'ODMR':
             sig = diff_array[::2] # single integrated data point for each MW on/off window
@@ -128,8 +131,17 @@ class SpinMeasurements:
             for i in range(pts):
                 sig_array[i] = np.sum(sig_all[i::pts])
             return sig_array
+        
+        elif  exp_type == 'Calibrate_LaserLag':
+            """ Adaptation by Rolando 2026-3-10 """
+            sig_all = array[::1]          #diff_array[::1]
+            sig_array = np.ones(pts) # bright data array
+            for i in range(pts):
+                sig_array[i] = np.sum(sig_all[i::pts])
+                # Doing np.sum here will make the Y axis in the data plotting actually means "the total number of photons collected for all runs"
+            return sig_array
 
-        elif  exp_type == 'Optical T1' or exp_type == 'Calibrate_LaserLag':
+        elif  exp_type == 'Optical T1': #or exp_type == 'Calibrate_LaserLag':
             sig_all = diff_array[::2]
             sig_array = np.ones(pts) # bright data array
             for i in range(pts):
@@ -149,8 +161,11 @@ class SpinMeasurements:
             #return sig_array, bg_array
             #return sig_array
         elif exp_type == 'Rabi' or exp_type == 'T2' or exp_type == 'MW_T1' or exp_type == 'Correlation Spectroscopy':
-            sig_all = diff_array[::2] # single integrated data point for each MW on/off window
-            bg_all = diff_array[1::2]
+            # Adaptation (by Rolando)
+            #sig_all = diff_array[::2] # single integrated data point for each MW on/off window
+            #bg_all = diff_array[1::2]
+            sig_all = array[::2]
+            bg_all = array[1::2]
             sig_array = np.ones(pts) # bright data array
             bg_array = np.ones(pts) # dark data array
             for i in range(pts):
@@ -391,8 +406,11 @@ class SpinMeasurements:
             """"
             Mod. with function from TT driver (A.K.)
             """
+
+            tt_spcm_ch = 3
+
             #gw.daq.open_task(n_runs) # one clock per each of the "n_runs" no. of sequences
-            gw.daq.set_trigger_level(7, 1.1)
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.0)
 
             time_start = time.time()
             print("TIME 0 = ", time.time() - time_start)
@@ -493,6 +511,158 @@ class SpinMeasurements:
             gw.daq.free_time_tagger()
             gw.ps.Pulser.reset()
             gw.laser.off()
+
+    def cal_lag_run_R(self, **kwargs):
+
+        with InstrumentGateway() as gw, DataSource('Calibration') as cal_data:
+             # read window timings that will be swept over in the calibration
+            read_start_times = np.linspace(kwargs['Read_Start_Time'], kwargs['Read_Stop_Time'], kwargs['num_pts']) * 1e9
+            #num_read_wind = len(read_windows)
+
+            # define buffer size here
+            expected_bins = kwargs['runs'] * kwargs['num_pts']
+
+            np.set_printoptions(precision = 6)
+
+            signal_sweeps = StreamingList()
+            #background_sweeps = StreamingList()
+
+            # set initial parameters for instrument server devices
+            # Turn on the laser
+            gw.ps.laser_on()
+            gw.laser.cw_mode()
+            gw.laser.on()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['laser_power']) 
+
+            #gw.daq.open_task(len(calibrate_buffer[0]))
+
+            """ Time Tagger Channel, Trigger Level and Counting Event Setup """
+            tt_gate_ch = 1
+            #tt_sync_ch = 2
+            tt_spcm_ch = 3
+
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)   # Gate channel trigger level
+            #gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
+
+            ps_seq = gw.ps.Calibrate_LaserLag_R(read_start_times, kwargs['laser_start']*1e9, kwargs['read_window']*1e9, kwargs['laser_window']*1e9) # pulse streamer sequence for CW ODMR
+
+            with tqdm(total = kwargs['iters']) as pbar:
+
+                for iter in range(kwargs['iters']):
+                    
+                    #Cal_result = self.read(calibrate_buffer[0], ps_seq, kwargs['runs'])
+
+                    gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins) 
+                    gw.daq.CBM_start()
+                    gw.daq.sync()
+
+                    gw.ps.stream(obtain(ps_seq), kwargs['runs']) 
+                    
+                    
+                    ready = False
+                    while ready is False:
+                        ready = gw.daq.cbm_ready()
+                    
+                    cal_result = obtain(gw.daq.count_BM())
+                    binwidths_s = obtain(gw.daq.cbm_get_BinWidths()) * 1e-12 # convert to seconds
+
+                    # turn results into signal and background datasets
+                    sig_array = self.digital_math(cal_result, 'Calibrate_LaserLag', kwargs['num_pts'])
+                    sig_bins = self.digital_math(binwidths_s, 'Calibrate_LaserLag', kwargs['num_pts'])
+
+                    sig_array = sig_array / sig_bins
+
+                    """ raw = np.asarray(obtain(gw.daq.count_BM()), dtype=np.int64).ravel()
+                    binwidths_s = np.asarray(binwidths_s, dtype=np.float64).ravel()
+
+                    # Convert to per-gate counts robustly
+                    if raw.size == expected_bins + 1:
+                        # Common case: leading 0 and cumulative totals
+                        per_gate = np.diff(raw)
+                    else:
+                        # Common case: already per gate
+                        per_gate = raw[:expected_bins]
+
+                    # Now map: (runs, num_pts) -> sum over runs
+                    per_gate = per_gate.reshape(kwargs['runs'], kwargs['num_pts'])
+                    binwidths_s = binwidths_s.reshape(kwargs['runs'], kwargs['num_pts'])
+                    sig_array = per_gate.sum(axis=0)/binwidths_s.sum(axis=0) # convert to counts/s by dividing by total time in each bin across runs """
+                    
+                    #print('mw_times_ordered is: \n',mw_times_ordered)
+                    signal_sweeps.append(np.stack([read_start_times, sig_array]))
+                    # notify the streaminglist that this entry has updated so it will be pushed to the data server
+                    signal_sweeps.updated_item(-1)
+
+                    cal_data.push({'params': {'mw_num': kwargs['num_pts'], 'iter_num': kwargs['iters'],'runs_num': kwargs['runs']},
+                                    'title': 'Calibrate LaserLag',
+                                    'xlabel': 'Read Start Time (ns)',
+                                    'ylabel': 'Counts',
+                                    'datasets': {'signal' : signal_sweeps}
+                    })
+                    if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                        #gw.daq.free_time_tagger()
+                        gw.ps.ps_reset()
+                        gw.laser.off()
+                        gw.laser.get_power()
+                        gw.laser.set_power(0)
+                        print('the GUI has asked us nicely to exit')
+                        return
+
+                    pbar.update(1)
+
+            gw.ps.ps_reset()
+            gw.laser.off()
+            gw.laser.get_power()
+            gw.laser.set_power(0)
+
+
+    def cal_initialize_run_R(self, **kwargs):
+
+        with InstrumentGateway() as gw, DataSource('Calibration') as cal_data:
+             # read window timings that will be swept over in the calibration
+            read_windows = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
+            num_read_wind = len(read_windows)
+
+            # define buffer size here
+            """ init_buffer_size = kwargs['runs']*num_read_wind
+            if init_buffer_size < 4:
+                raise ValueError("Buffer size too small.")
+
+            ni_sample_buffer = np.ascontiguousarray(np.zeros(init_buffer_size), dtype=np.float64)
+            init_buffer = [ni_sample_buffer] """
+
+            np.set_printoptions(precision = 6)
+
+            dataset = {'cal': []}
+
+            # set initial parameters for instrument server devices
+            gw.ps.clock_time = 11 # [ns] width of our clock pulse.
+            runs = kwargs['runs'] #number of runs per point
+
+            ps_seq = gw.ps.Calibrate_Initialize_R(read_windows, kwargs['init_pulse']) # pulse streamer sequence for CW ODMR
+                
+            cal_result = self.read(init_buffer[0], ps_seq, kwargs['runs']/4) # read samples to buffer
+            print("RESULT: ", cal_result)
+            # partition buffer into signal and background datasets
+            cal = self.analog_math(cal_result, 'Cal', num_read_wind)
+
+            dataset['cal'].append(np.stack([read_windows/1e3, cal]))
+
+            # send data to data server for plotting
+            cal_data.push({'params': {'runs_num': kwargs['runs'],
+                            'r': gw.zaber.update_positions_callback(),
+                            'theta': gw.thor_polar.update_positions_callback(),
+                            'phi': gw.thor_azi.update_positions_callback()}, 
+                            'dataset': dataset})
+
+            # kwargs['queue'].put(100)
+
+            # close DAQ task + reset SG396 and PS parameters
+            # print("TASK ID: ", gw.daq.read_task)
+            gw.daq.close_task()
+            gw.ps.Pulser.reset()
 
     def cal_initialize_run(self, **kwargs):
 
@@ -796,20 +966,20 @@ class SpinMeasurements:
             # We define parameters 
             dwell_time = int(kwargs['dwell_time']*1e9) # in nanoseconds
             n_bins = 2
-            bin_width = int(dwell_time/n_bins) # in ns
+            #bin_width = int(dwell_time/n_bins) # in ns
             
 
             # Set laser
             gw.laser.cw_mode()
             gw.laser.get_power()
-            gw.laser.set_power(kwargs['laser_power']) # Set laser power to 5%
+            gw.laser.set_power(kwargs['laser_power']) # Set laser power to defined percentage % at GUI
             gw.laser.on()
 
             # We create the Pulse Streamer seq.
             if kwargs['odmr_type'] == 'CW':
-                cw_odmr_seq = gw.ps.New_CW_ODMR_R(dwell_time, kwargs['runs'])
+                cw_odmr_seq = gw.ps.New_CW_ODMR_R(dwell_time, kwargs['CW_Buffer_Time'], kwargs['runs'])
             elif kwargs['odmr_type']=='Pulsed':
-                pul_odmr_seq = gw.ps.Pulsed_ODMR_R(kwargs['init_time']*1e9, kwargs['wait_time']*1e9, kwargs['pi_xy'], kwargs['probe_time']*1e9, kwargs['read_wait']*1e9, kwargs['read_time']*1e9)
+                pul_odmr_seq = gw.ps.Pulsed_ODMR_R_2(kwargs['init_time']*1e9, kwargs['wait_time']*1e9, kwargs['pi_xy'], kwargs['probe_time']*1e9, kwargs['read_wait']*1e9, kwargs['read_time']*1e9, kwargs['seq_gap']*1e9)
             else:
                 raise ValueError("Invalid ODMR type")
 
@@ -825,7 +995,7 @@ class SpinMeasurements:
             #gw.daq.set_trigger_level(spcm, 1.3)
             gw.daq.set_trigger_level(tt_gate_ch, 1.3)
             gw.daq.set_trigger_level(tt_sync_ch, 1.3)
-            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.0)
 
             
             # Set the sig. gen parameters.
@@ -838,6 +1008,12 @@ class SpinMeasurements:
             sig_a = np.zeros(kwargs['num_points'])
             bg_a = np.zeros(kwargs['num_points'])
 
+            # Enable Laser if the ODMR type is CW
+            """ if kwargs['odmr_type'] == 'CW':
+                gw.ps.laser_on()
+            else:   
+                pass """
+            
             for iter in range(kwargs['iterations']):
                 print(f"Iteration {iter + 1} of {kwargs['iterations']}")
                 sig = []
@@ -850,9 +1026,13 @@ class SpinMeasurements:
                         #tag_proxy = gw.daq.synchro()
                         #tagger=tag_proxy,
                         #gw.daq.start_counter(channels=[tt_spcm_ch], binwidth=bin_width*1E3, n_values=n_bins)
+                        
                         n_runs = kwargs['runs']
                         gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, n_bins*n_runs)
                         #gw.daq.sFor_Counter(int(dwell_time*1E3))
+                        # We clear the time tagger buffer at the beginning of the experiment to make sure we are starting with a clean slate
+                        gw.daq.cbm_clear()
+
                         gw.daq.CBM_start()
                         gw.daq.sync()
                         gw.ps.stream(obtain(cw_odmr_seq), n_runs)
@@ -862,16 +1042,17 @@ class SpinMeasurements:
                         ready = False
                         while ready is False:
                             ready = gw.daq.cbm_ready()
-                            counts = obtain(gw.daq.count_BM())
-                            binwidths = obtain(gw.daq.cbm_get_BinWidths())
+
+                        counts = obtain(gw.daq.count_BM())
+                        binwidths = obtain(gw.daq.cbm_get_BinWidths())
                         
                         counts = np.asarray(counts, dtype=float)  
                         
                         #counter_data = obtain(gw.daq.get_counter_data())
                         
                         # Record of photon counts (cps)
-                        sig_cps = float(counts[0]/((binwidths[0])*1e-12))  # cps, since bin_width is in ns, we convert it to s
-                        bg_cps = float(counts[1]/((binwidths[1])*1e-12))  # cps
+                        sig_cps = float(counts[0::2]/((binwidths[0::2])*1e-12))  # cps, since bin_width is in ns, we convert it to s
+                        bg_cps = float(counts[1::2]/((binwidths[1::2])*1e-12))  # cps
                         sig.append(sig_cps)  # cps, since bin_width is in ns, we convert it to s
                         bg.append(bg_cps)  # cps
                         # Count verification
@@ -880,7 +1061,7 @@ class SpinMeasurements:
                         print(f"Background counts (cps): {bg_cps:.3f}")
 
                     elif kwargs['odmr_type'] == 'Pulsed':
-                        runs = 1000
+                        runs = kwargs['runs']
                         gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, runs*2)
                         gw.daq.CBM_start()
                         gw.daq.sync()
@@ -888,19 +1069,26 @@ class SpinMeasurements:
                         ready = False
                         while ready is False:
                             ready = gw.daq.cbm_ready()
-                            counts = obtain(gw.daq.count_BM())
-                            binwidths = obtain(gw.daq.cbm_get_BinWidths())
+
+                        counts = obtain(gw.daq.count_BM())
+                        binwidths = obtain(gw.daq.cbm_get_BinWidths())
                         
                         counts = np.asarray(counts, dtype=float)
 
+
                         # cps
                         # read_time_s = float(kwargs['read_time'])
-                        sig_cps = counts[0::2].sum() / (binwidths[0] * runs)  # cps
-                        bg_cps = counts[1::2].sum() / (binwidths[1] * runs)  # cps
+                        sig_cps = counts[0::2].sum() / (binwidths[0::2]*1e-12 * runs)  # cps
+                        bg_cps = counts[1::2].sum() / (binwidths[1::2]*1e-12 * runs)  # cps
                         
                         # Record of photon counts
-                        sig.append(sig_cps)  # cps
-                        bg.append(bg_cps)  # cps
+                        sig.append(np.mean(sig_cps))  # cps
+                        bg.append(np.mean(bg_cps))  # cps
+
+                        # Count verification
+                        #print("counter_data: ", counts)
+                        #print(f"Signal counts (cps): {sig_cps}")
+                        #print(f"Background counts (cps): {bg_cps}")
 
                 # avg_data = (avg_data*iter + np.array(signal_sweeps))/(iter+1)
                 sig_a = (sig_a*iter + np.array(sig))/(iter+1) #sig_a = (sig_a*iter + np.array([float(x) for x in sig]))/(iter+1)
@@ -918,6 +1106,17 @@ class SpinMeasurements:
                 background_sweeps.updated_item(-1)
                 norm_sweeps.updated_item(-1)
 
+                # Data push 
+                odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
+                                    'title': 'Optically Detected Magnetic Resonance',
+                                    'xlabel': 'Frequency (GHz)',
+                                    'ylabel': 'Counts',
+                                    'datasets': {'signal' : signal_sweeps,
+                                                'background': background_sweeps,
+                                                'norm' : norm_sweeps
+                                                } #'frequencies': frequencies
+                        })
+
                 if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
                     #gw.daq.free_time_tagger()
                     gw.sg.set_rf_toggle(0)
@@ -932,15 +1131,133 @@ class SpinMeasurements:
                     print('the GUI has asked us nicely to exit')
                     return
 
-                
-                # Data push 
-                odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
+        # We turn OFF the mw signal (modulation and amplitude)
+        gw.sg.set_mod_toggle(0)
+        #print(9)
+        gw.sg.set_rf_toggle(0)
+        #print(8)
+        gw.laser.get_power()
+        gw.laser.set_power(0)
+        gw.ps.just_gate_off() # We close the SPCM gate
+        gw.laser.off()
+        #gw.ps.constant(OutputState([], 0.0, 0.0))
+        gw.ps.constant_off()
+        gw.ps.ps_reset()
+        #gw.daq.free_time_tagger()
+        print("Measurement completed.")
+
+    def pulsed_calibration_run(self, **kwargs):
+        """
+        Rolando A. Fimbres Grijalva 2/16/2026
+        Docstring for pulsed_calibration_run
+        
+        :param self: Description
+        :param kwargs: Description
+        """
+        with InstrumentGateway() as gw, DataSource(kwargs['dataset']) as pulsed_calibration_data:
+
+            # Sig. Gen. cannot allow more than 6 digits after the decimal point.
+            np.set_printoptions(precision = 6)
+            
+            bright_seq = StreamingList()
+            dark_seq = StreamingList()
+            #bright_t_axis = StreamingList()
+            #dark_t_axis = StreamingList()
+
+            # We define parameters
+            single_seq_duration = (kwargs['init_time'] + kwargs['wait_time']) * 1e9 # in nanoseconds, we only look at the first two steps of the sequence for calibration, which are the bright and dark time windows
+            time_resolution = kwargs['time_resolution'] * 1e9 # Time resolution for the Time Tagger in nanoseconds
+            num_bins = int(single_seq_duration / time_resolution) # These are the number of bins per individual sequence, we are running two sequences (bright and dark), so the total number of bins will be 2*num_bins
+            #freq_set = kwargs['set_freq'] # Set frequency for the pulsed calibration, since we are not sweeping freq, we just set it to a fixed value
+
+            # Set laser
+            gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['laser_power']) # Set laser power to defined percentage % at GUI
+            gw.laser.on()
+
+            # We create the Pulse Streamer seq.
+            calib_seq = gw.ps.calibration_pulsed(kwargs['init_time']*1e9, kwargs['wait_time']*1e9, kwargs['pi_xy'], kwargs['time_resolution']*1e9)
+
+            # We set parameters for our signal generator
+            gw.sg.set_rf_amplitude(kwargs['mw_power'])
+
+            # We assign Trigger Levels, and counting event in the Time Tagger
+            tt_gate_ch = 1
+            tt_sync_ch = 2
+            tt_spcm_ch = 3
+
+            #gw.daq.set_trigger_level(spcm, 1.3)
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)
+            gw.daq.set_trigger_level(tt_sync_ch, 1.3)
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)
+
+            # Set the sig. gen parameters.
+            gw.sg.set_frequency(kwargs['set_freq'])
+            gw.sg.set_rf_amplitude(kwargs['mw_power'])
+            gw.sg.set_mod_type(6) # 'IQ' modulation : 6
+            gw.sg.set_qmod_function(5) # 'IQ modulation function': External
+            gw.sg.set_mod_toggle(1) # Modulation ON
+            gw.sg.set_rf_toggle(1)  # RF ON
+
+            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, 2*num_bins)
+            gw.daq.CBM_start()
+            gw.daq.sync()
+            n_runs = 1
+            gw.ps.stream(obtain(calib_seq), n_runs)
+            ready = False
+            while ready is False:
+                ready = gw.daq.cbm_ready()
+                counts = obtain(gw.daq.count_BM())
+                binwidths = obtain(gw.daq.cbm_get_BinWidths())
+            
+            counts = np.asarray(counts, dtype=float)
+            binwidths = np.asarray(binwidths, dtype=float)
+
+            # We record the counts in each bin, and convert them to cps, 1st bin corresponds to the bright window, 2nd bin corresponds to the dark window
+            bright_counts = counts[0:num_bins]
+            dark_counts = counts[num_bins:2*num_bins]
+            bright_times = binwidths[0:num_bins]
+            dark_times = binwidths[num_bins:2*num_bins]
+            # Loop to convert counts to cps for each respective bin
+            bright_cps = [bright_counts[i]/(bright_times[i]*1e-12) for i in range(num_bins)]
+            dark_cps = [dark_counts[i]/(dark_times[i]*1e-12) for i in range(num_bins)]
+            
+            # Time arrays
+            bright_t_axis = np.cumsum(bright_times)
+            dark_t_axis = np.cumsum(dark_times)
+            #bright_t_axis.updated_item(-1)
+            #dark_t_axis.updated_item(-1)
+
+            bright_seq.append(np.stack([bright_t_axis, bright_cps]))
+            dark_seq.append(np.stack([dark_t_axis, dark_cps]))
+            # Notify the streamlist, and update it
+            bright_seq.updated_item(-1)
+            dark_seq.updated_item(-1)
+            
+
+            if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                    #gw.daq.free_time_tagger()
+                    gw.sg.set_rf_toggle(0)
+                    print(6)
+                    gw.sg.set_mod_toggle(0)
+                    print(7)
+                    gw.ps.ps_reset()
+                    gw.laser.get_power()
+                    gw.laser.set_power(0)
+                    gw.ps.just_gate_off() # We close the SPCM gate
+                    gw.laser.off()
+                    print('the GUI has asked us nicely to exit')
+                    return
+            # Data push 
+            pulsed_calibration_data.push({'params': {'start': kwargs['set_freq'], 'iterations': kwargs['iterations']},
                                     'title': 'Optically Detected Magnetic Resonance',
-                                    'xlabel': 'Frequency (GHz)',
-                                    'ylabel': 'Counts',
-                                    'datasets': {'signal' : signal_sweeps,
-                                                'background': background_sweeps,
-                                                'norm' : norm_sweeps
+                                    'xlabel': 'Time (ns)',
+                                    'ylabel': 'Counts (cps)',
+                                    'datasets': {'Bright |0>' : bright_seq,
+                                                'Dark |+/-1>' : dark_seq,
+                                                'Bright_t' : bright_t_axis,
+                                                'Dark_t' : dark_t_axis
                                                 } #'frequencies': frequencies
                         })
 
@@ -949,14 +1266,16 @@ class SpinMeasurements:
         #print(9)
         gw.sg.set_rf_toggle(0)
         #print(8)
+        gw.laser.get_power()
+        gw.laser.set_power(0)
+        gw.ps.just_gate_off() # We close the SPCM gate
         gw.laser.off()
         #gw.ps.constant(OutputState([], 0.0, 0.0))
         gw.ps.constant_off()
         gw.ps.ps_reset()
         #gw.daq.free_time_tagger()
         print("Measurement completed.")
-
-
+    
     #ODMR_2Dsweeping
     def odmr_run_with_2d_scan(self, **kwargs):
         '''
@@ -1624,12 +1943,13 @@ class SpinMeasurements:
             np.set_printoptions(precision=6)
 
             # pi pulse durations that will be swept over in the Rabi measurement (converted to ns)
-            mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])
-            #num_mw = len(mw_times)
+            mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
 
             signal_sweeps = StreamingList()
             background_sweeps = StreamingList()
 
+            np.random.shuffle(mw_times) # random shuffel the mw_times for balancing the heating and charge of the sample
+            print("MW times after random shuffle:", mw_times)
                         
             # set initial parameters for instrument server devices
             # Turn on the laser
@@ -1640,12 +1960,13 @@ class SpinMeasurements:
 
             """ Time Tagger Channel, Trigger Level and Counting Event Setup """
             tt_gate_ch = 1
-            tt_sync_ch = 2
+            #tt_sync_ch = 2
             tt_spcm_ch = 3
 
             gw.daq.set_trigger_level(tt_gate_ch, 1.3)   # Gate channel trigger level
-            gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
-            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
+            #gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.0)   # SPCM channel trigger level
+
 
             # Setup the MW
             gw.sg.set_frequency(kwargs['freq'])
@@ -1655,96 +1976,133 @@ class SpinMeasurements:
             gw.sg.set_mod_toggle(1)
             gw.sg.set_rf_toggle(1)
 
+            
             # pulse streamer sequence
             print("USING SRS FOR RABI MEASUREMENT.")
-            ps_seq = gw.ps.Rabi_R(mw_times*1e9, kwargs['pi_xy'], kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['wait_time']*1e9, kwargs['read_wait']*1e9)
+            ps_seq = gw.ps.Rabi_R(
+                mw_times,
+                kwargs['pi_xy'],
+                kwargs['init_time']*1e9,
+                kwargs['read_time']*1e9,
+                kwargs['wait_time']*1e9,
+                kwargs['read_wait']*1e9,
+                kwargs['seq_gap']*1e9
+            )
 
-            """ Time Tagger Channel, Trigger Level and Counting Event Setup """
-            tt_gate_ch = 1
-            tt_sync_ch = 2
-            tt_spcm_ch = 3
+            index_order = np.argsort(mw_times) 
+            mw_times_ordered = np.sort(mw_times) # record the ordered mw_times for Rabi plotting
 
-            gw.daq.set_trigger_level(tt_gate_ch, 1.3)   # Gate channel trigger level
-            gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
-            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
+            rabi_sig_a = np.zeros(kwargs['num_pts'])
+            rabi_bg_a = np.zeros(kwargs['num_pts'])
 
-            # Setup the MW
-            gw.sg.set_frequency(kwargs['freq'])
-            gw.sg.set_rf_amplitude(kwargs['rf_power'])
-            gw.sg.set_mod_type(6)
-            gw.sg.set_qmod_function(5)
-            gw.sg.set_mod_toggle(1)
-            gw.sg.set_rf_toggle(1)
+            with tqdm(total = kwargs['iters']) as pbar:
 
-            runs = kwargs['iterations'] # set as a test
+                for iter in range(kwargs['iters']):
 
-            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, 2*len(mw_times)*runs) 
-            gw.daq.CBM_start()
-            gw.daq.sync()
-            gw.ps.stream(obtain(ps_seq), runs) 
-            print(1)
-            ready = False
-            while ready is False:
-                ready = gw.daq.cbm_ready()
-                counts = gw.daq.count_BM()
+                    #rabi_sig_list = []
+                    #rabi_bg_list = []
 
-            print(f"Counts array shape: {counts.shape}, expected length: {2*len(mw_times)*runs}")
-                
-            i = 0
-            sig = np.zeros(len(mw_times))
-            bg = np.zeros(len(mw_times))
-            length_unit = len(mw_times)*2 # Length of data values in one full sequence (signal + background)
-            while i < len(counts):
-                unit_data = counts[i:i+length_unit] # Used to separate data for a single full sequence
-                sig = np.asarray(sig, dtype=float)
-                sig += np.array([float(x) for x in unit_data[1::2]])
-                bg = np.asarray(bg, dtype=float)
-                bg += np.array([float(x) for x in unit_data[::2]])
-                i += length_unit
+                    expected_bins = 2 * kwargs['runs'] * kwargs['num_pts']
 
-            sig = sig/runs
-            bg = bg/runs
-            print("Signal counts:\n", sig)
-            print("Background counts:\n", bg)
-            print("MW times (ns):\n", mw_times)
-            signal_sweeps.append(np.stack([mw_times*1e9, sig]))
-            background_sweeps.append(np.stack([mw_times*1e9, bg]))
-            # notify the streaminglist that this entry has updated so it will be pushed to the data server
-            signal_sweeps.updated_item(-1)
-            background_sweeps.updated_item(-1)
+                    gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                    # We clear the time tagger buffer at the beginning of the experiment to make sure we are starting with a clean slate
+                    gw.daq.cbm_clear()
 
-            if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                # gw.daq.free_time_tagger()
-                gw.sg.set_rf_toggle(0)
-                gw.sg.set_mod_toggle(0)
-                gw.ps.ps_reset()
-                gw.laser.get_power()
-                gw.laser.off()
-                gw.laser.set_power(0)
-                # if kwargs['rabi_type'] == "SRS":
-                #else:
-                # gw.windfreak.ch0_off()
-                print('the GUI has asked us nicely to exit')
-                return
+                    gw.daq.CBM_start()
+                    gw.daq.sync() 
 
-            rabi_data.push({'params': {'mw_num': kwargs['num_pts'], 'iter_num': kwargs['iterations'],'runs_num': kwargs['runs']},
-                            'title': 'Rabi',
+                    gw.ps.stream(obtain(ps_seq), kwargs['runs']) 
+                    
+                    
+                    ready = False
+                    while ready is False:
+                        ready = gw.daq.cbm_ready()
+                    
+                    rabi_result = obtain(gw.daq.count_BM())
+                    binwidths = obtain(gw.daq.cbm_get_BinWidths())#*1e-12  # convert bin widths from picoseconds to seconds """
+
+                    #print("expected_bins:", expected_bins)
+                    #print("len(count_BM):", len(rabi_result))
+                    #print("len(binwidths):", len(binwidths))
+
+                    rabi_sig_raw, rabi_bg_raw = self.digital_math(rabi_result, 'Rabi', kwargs['num_pts'])
+                    sig_bins, bg_bins = self.digital_math(binwidths, 'Rabi', kwargs['num_pts'])
+
+                    #sig_bins, bg_bins = sig_bins/kwargs['runs'], bg_bins/kwargs['runs']
+
+                    # Convert to countrates per second (cps) if we have the bin widths available
+                    #epsilon = 1e-12  # small constant to prevent division by zero
+                    rabi_sig = (rabi_sig_raw / sig_bins) * 1e12  # convert to counts per second (cps) 
+                    rabi_bg = (rabi_bg_raw / bg_bins) * 1e12  # convert to counts per second (cps)
+
+
+                    # correct the y-axis data ordering for plots
+                    rabi_sig = np.array([rabi_sig[i] for i in index_order])
+                    rabi_bg = np.array([rabi_bg[i] for i in index_order])
+
+                    # Averaging over iterations
+                    #rabi_sig_list.append(rabi_sig)
+                    
+                    #rabi_bg_list.append(rabi_bg)
+                    #print("sig shape", sig_array.shape)
+
+                    #print("Iteration number\n", iter)
+                    #print("current sig \n", rabi_sig)
+                    
+                    #print("sig_array before averaging\n", rabi_sig_a)
+                    rabi_sig_a = (rabi_sig_a*iter + rabi_sig) / (iter + 1)  # rabi_sig_a = (rabi_sig_a*iter + np.array(rabi_sig_list)) / (iter + 1)
+                    #print("sig_array after averaging\n", rabi_sig_a)
+                    rabi_bg_a = (rabi_bg_a*iter + rabi_bg) / (iter + 1)      # rabi_bg_a = (rabi_bg_a*iter + np.array(rabi_bg_list)) / (iter + 1)
+
+                    
+
+                    signal_sweeps.append(np.stack([mw_times_ordered, rabi_sig_a]))
+                    background_sweeps.append(np.stack([mw_times_ordered, rabi_bg_a]))
+                    signal_sweeps.updated_item(-1)
+                    background_sweeps.updated_item(-1)
+
+                    rabi_data.push({
+                        'params': {
+                            'mw_num': kwargs['num_pts'],
+                            'iter_num': kwargs['iters'],
+                            'runs_num': kwargs['runs'],
+                            'freq': kwargs['freq'],
+                            'rf_power': kwargs['rf_power']
+                        },
+                            'title': 'Rabi',                       
                             'xlabel': 'MW Time (ns)',
                             'ylabel': 'Counts',
-                            'datasets': {'signal' : signal_sweeps,
-                                        'background': background_sweeps}
-            })
+                            'datasets': {
+                                'signal' : signal_sweeps,
+                                'background': background_sweeps
+                            }
+                    })
+                    if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                        gw.sg.set_rf_toggle(0)
+                        gw.sg.set_mod_toggle(0)
+                        gw.ps.ps_reset()
+                        gw.laser.get_power()
+                        gw.laser.off()
+                        gw.laser.set_power(0)
+                        print('the GUI has asked us nicely to exit')
+                        return  
+                    pbar.update(1)
+            
+            # Prints below used for troubleshooting the data handling
+            #print("Sum of signal counts in all runs\n", sig_array)
+            #print("Sum of background counts in all runs\n", bg_array)
+            #print("Sum of signal capture durations in all runs [ps]\n", sig_bins)
+            #print("Sum of background capture durations in all runs [ps]\n", bg_bins)
 
-                
-        # We turn OFF the mw signal (modulation and amplitude)        
-        gw.sg.set_rf_toggle(0)
-        gw.sg.set_mod_toggle(0)
-        gw.laser.off()
-        gw.laser.get_power()
-        gw.laser.set_power(0)
-        gw.ps.ps_reset()
-        # gw.daq.free_time_tagger()
-        # if kwargs['rabi_type'] == "SRS":
+            # We turn OFF the mw signal (modulation and amplitude)        
+            gw.sg.set_rf_toggle(0)
+            gw.sg.set_mod_toggle(0)
+            gw.laser.off()
+            gw.laser.get_power()
+            gw.laser.set_power(0)
+            gw.ps.ps_reset()
+            # gw.daq.free_time_tagger()
+            # if kwargs['rabi_type'] == "SRS":
             
     def rabi_run_R2(self, **kwargs):
         """
@@ -1892,14 +2250,22 @@ class SpinMeasurements:
             if not two_selected():
                 scanned_axis2 = None
                 print("Error: You must select exactly two axes.")
-            else:
-                # choose the non-X axis as axis2 (prefer Y if both present)
+            elif _checkbox_state(kwargs.get('Select X')):
+                scanned_axis1 = 1  # X
                 if _checkbox_state(kwargs.get('Select Y')):
+                    scanned_axis2 = 2  # Y
+                else:
+                    scanned_axis2 = 3  # Z   
+            else:
+                scanned_axis1 = 2
+                scanned_axis2 = 3
+                # choose the non-X axis as axis2 (prefer Y if both present)
+                """  if _checkbox_state(kwargs.get('Select Y')):
                     scanned_axis2 = 2
                 elif _checkbox_state(kwargs.get('Select Z')):
                     scanned_axis2 = 3
                 else:
-                    scanned_axis2 = None
+                    scanned_axis2 = None """
 
             # Parameter Setup
 
@@ -1920,7 +2286,7 @@ class SpinMeasurements:
             # Time Tagger parameters
             tt_spcm = 3
             tt_ttl = 4
-            gw.daq.set_trigger_level(tt_spcm, 1.1)
+            gw.daq.set_trigger_level(tt_spcm, 1.0)
             gw.daq.set_trigger_level(tt_ttl, 1.1)
 
             # Count storage
@@ -1929,8 +2295,8 @@ class SpinMeasurements:
             averaged_counts = []
 
             # MCL Setup
-            gw.nano.iss_bind_clock_to_axis(1, 2, 1, gw.nano.handle) 
-            gw.nano.single_write_n(axis1_forward[0], 1, gw.nano.handle) # Move to initial position in axis 1 1/15/2026  work on this
+            gw.nano.iss_bind_clock_to_axis(1, 2, scanned_axis1, gw.nano.handle) 
+            gw.nano.single_write_n(axis1_forward[0], scanned_axis1, gw.nano.handle) # Move to initial position in axis 1 1/15/2026  work on this
             gw.nano.single_write_n(axis2[0], scanned_axis2, gw.nano.handle) # Move to initial position in axis 2
             dwell_time = kwargs['Dwell_Time']
 
@@ -1946,7 +2312,14 @@ class SpinMeasurements:
             # Scanning Loop
             for index_axis2 in range(len(axis2)):
                 # Move forward
-                gw.nano.wfma_setup(axis1_forward, None, None, setup_points, dwell_time, 1, gw.nano.handle)
+                if scanned_axis1 == 1:
+                    gw.nano.wfma_setup(axis1_forward, None, None, setup_points, dwell_time, 1, gw.nano.handle)
+                elif scanned_axis1 == 2:
+                    gw.nano.wfma_setup(None, axis1_forward, None, setup_points, dwell_time, 1, gw.nano.handle)
+                elif scanned_axis1 == 3:
+                    gw.nano.wfma_setup(None, None, axis1_forward, setup_points, dwell_time, 1, gw.nano.handle)
+                else:
+                    raise ValueError("scanned_axis1 is not 1-3")
                 gw.daq.start_cbm(tt_spcm, tt_ttl, CHANNEL_UNUSED, data_points)
                 gw.daq.CBM_start()
                 gw.daq.sync()
@@ -2005,11 +2378,22 @@ class SpinMeasurements:
             axis1_positions = np.array(axis1_forward[:data_points], dtype=np.float64) - zero_offset_um
             axis2_positions = np.array(axis2, dtype=np.float64) - zero_offset_um
 
+            if scanned_axis1 == 1:
+                scanned_axis1_label = 'X'
+            else:
+                scanned_axis1_label = 'Y'
+
+            if scanned_axis2 == 2:
+                scanned_axis2_label = 'Y'
+            else:
+                scanned_axis2_label = 'Z'
+
+
             # Push data to data server
             scan_data.push({
-                'title': 'XY Scan',    
-                'xLabel': 'X (um)',
-                'yLabel': 'Y (um)',
+                'title': scanned_axis1_label + scanned_axis2_label +' Scan',    
+                'xLabel': scanned_axis1_label + ' (µm)',
+                'yLabel': scanned_axis2_label + ' (µm)',
                 'zLabel': 'Counts',
                 'datasets': {
                     'xSteps': axis1_positions,

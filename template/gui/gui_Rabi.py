@@ -27,7 +27,7 @@ class RabiWidget(ExperimentWidget):
             'runs': {
                 'display_text': 'Runs (per pt.): ',
                 'widget': SpinBox(
-                    value = 2000,
+                    value = 200,
                     int = True,
                     bounds=(1, None),
                 ),
@@ -36,7 +36,7 @@ class RabiWidget(ExperimentWidget):
             'freq': {
                 'display_text': 'MW Freq.: ',
                 'widget': SpinBox(
-                    value = 2.875e9,
+                    value = 2.87e9,
                     suffix = 'Hz',
                     siPrefix = True,
                     bounds = (100.000e3, 6.000e9),
@@ -44,7 +44,7 @@ class RabiWidget(ExperimentWidget):
                 ),
             },
             
-            'iterations': {
+            'iters': {
                 'display_text': 'Num. of Iterations',
                 'widget': SpinBox(
                     value = 1,
@@ -60,16 +60,16 @@ class RabiWidget(ExperimentWidget):
                     value = -15,
                     suffix = 'dBm',
                     siPrefix = False,
-                    bounds = (None, -15),
+                    bounds = (None, 2),
                 ),
             },
             'start': {
                 'display_text': 'Start MW Pulse Time: ',
                 'widget': SpinBox(
-                    value = 0,
+                    value = 10e-9,
                     suffix = 's',
                     siPrefix = True,
-                    bounds = (0, None),
+                    bounds = (2e-9, None),
                     dec = True,
                 ),
             },
@@ -80,7 +80,7 @@ class RabiWidget(ExperimentWidget):
                     value = 300e-9,
                     suffix = 's',
                     siPrefix = True,
-                    bounds = (0, None),
+                    bounds = (2e-9, None),
                     dec = True,
                 ),
             },
@@ -136,9 +136,9 @@ class RabiWidget(ExperimentWidget):
             },
 
             'read_wait': {
-                'display_text': 'Read Wait: ',
+                'display_text': 'Read Wait (dur. before readout): ',
                 'widget': SpinBox(
-                    value = 350e-9,
+                    value = 10e-9,
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
