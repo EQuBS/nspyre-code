@@ -18,6 +18,21 @@ class NanoWidget(QtWidgets.QWidget):
         """
         super().__init__()
         self.nano = nano
+
+        ### Added by Rolando 4/3/2026  ####################
+        self.axis_ranges = {
+            1: float(self.nano.get_calibration(1, self.nano.handle)),
+            2: float(self.nano.get_calibration(2, self.nano.handle)),
+            3: float(self.nano.get_calibration(3, self.nano.handle)),
+        }
+        self.axis_centers = {
+            axis: self.axis_ranges[axis] / 2.0
+            for axis in (1, 2, 3)
+        }
+
+        
+
+        ############################################
         """ if nano is None or handle is None:
             self.nano = MCL_Nanodrive()
             self.handle = self.nano.init_handle()
@@ -60,9 +75,9 @@ class NanoWidget(QtWidgets.QWidget):
             x = self.nano.single_read_n(1, self.nano.handle) #self.nano.handle
             y = self.nano.single_read_n(2, self.nano.handle) #self.nano.handle
             z = self.nano.single_read_n(3, self.nano.handle) #self.nano.handle
-            self.x_pos_box.setText(f"{-100+(x):.4f}")
-            self.y_pos_box.setText(f"{-100+(y):.4f}")
-            self.z_pos_box.setText(f"{-100+(z):.4f}")
+            self.x_pos_box.setText(f"{self._hw_to_user(1, x):.3f}")
+            self.y_pos_box.setText(f"{self._hw_to_user(2, y):.3f}")
+            self.z_pos_box.setText(f"{self._hw_to_user(3, z):.3f}")
         read_button.clicked.connect(read_position)
 
         # Add widgets to layout
@@ -84,7 +99,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # X position spinbox
         layout.addWidget(QtWidgets.QLabel('X-Position (um)'), layout_row, 0)
-        self.x_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-100.000, 100.000), step=0.003, dec=4, int=False)
+        self.x_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-self.axis_centers[1], self.axis_centers[1]), step=0.003, dec=3, int=False)
         self.x_position_spinbox.setFixedSize(120, 30)
         self.x_position_spinbox.setValue(value=0)
         layout.addWidget(self.x_position_spinbox, layout_row, 1)
@@ -94,7 +109,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_xbutton = QtWidgets.QPushButton('Move')
         def move_x(button):
-            self.nano.monitor_n(100 + (self.x_position_spinbox.value()), 1, self.nano.handle)
+            self.nano.monitor_n(self._user_to_hw(1, self.x_position_spinbox.value()), 1, self.nano.handle)
         move_xbutton.clicked.connect(move_x)
         layout.addWidget(move_xbutton, layout_row, 2)
 
@@ -102,7 +117,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # Step size spinbox
         layout.addWidget(QtWidgets.QLabel('X Step Size (um)'), layout_row, 0)
-        self.x_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
+        self.x_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 9.000), step=0.003, dec=3, int=False)
         self.x_step_size_spinbox.setFixedSize(120, 30)
         self.x_step_size_spinbox.setValue(value=0.05)
         layout.addWidget(self.x_step_size_spinbox, layout_row, 1)
@@ -111,7 +126,8 @@ class NanoWidget(QtWidgets.QWidget):
         def plus_x(button):
             read_x = self.nano.single_read_n(1, self.nano.handle)
             self.nano.monitor_n(read_x + self.x_step_size_spinbox.value(), 1, self.nano.handle)
-        plus_xbutton.clicked.connect(plus_x)
+        #plus_xbutton.clicked.connect(plus_x)
+        plus_xbutton.clicked.connect(lambda _: self.step_axis(1, +self.x_step_size_spinbox.value()))
         layout.addWidget(plus_xbutton, layout_row, 2)
         plus_xbutton.setFixedSize(60, 30)
         #plus_button.clicked.connect(lambda: self.position_spinbox.setValue(self.position_spinbox.value() + 0.003))
@@ -120,7 +136,8 @@ class NanoWidget(QtWidgets.QWidget):
         def minus_x(button):
             read_x = self.nano.single_read_n(1, self.nano.handle)
             self.nano.monitor_n(read_x - self.x_step_size_spinbox.value(), 1, self.nano.handle)
-        minus_xbutton.clicked.connect(minus_x)
+        #minus_xbutton.clicked.connect(minus_x)
+        minus_xbutton.clicked.connect(lambda _: self.step_axis(1, -self.x_step_size_spinbox.value()))
         layout.addWidget(minus_xbutton, layout_row, 3)
         minus_xbutton.setFixedSize(60, 30)
         #minus_button.clicked.connect(lambda: self.position_spinbox.setValue(self.position_spinbox.value() - 0.003))
@@ -130,7 +147,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # Y position spinbox
         layout.addWidget(QtWidgets.QLabel('Y-Position (um)'), layout_row, 0)
-        self.y_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-100.000, 100.000), step=0.003, dec=4, int=False)
+        self.y_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-self.axis_centers[2], self.axis_centers[2]), step=0.003, dec=3, int=False)
         self.y_position_spinbox.setFixedSize(120, 30)
         self.y_position_spinbox.setValue(value=0)
         layout.addWidget(self.y_position_spinbox, layout_row, 1)
@@ -140,7 +157,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_ybutton = QtWidgets.QPushButton('Move')
         def move_y(button):
-            self.nano.monitor_n(100 + (self.y_position_spinbox.value()), 2, self.nano.handle)
+            self.nano.monitor_n(self._user_to_hw(2, self.y_position_spinbox.value()), 2, self.nano.handle)
         move_ybutton.clicked.connect(move_y)
         layout.addWidget(move_ybutton, layout_row, 2)
 
@@ -148,7 +165,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # Step size spinbox
         layout.addWidget(QtWidgets.QLabel('Y Step Size (um)'), layout_row, 0)
-        self.y_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
+        self.y_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 9.000), step=0.003, dec=3, int=False)
         self.y_step_size_spinbox.setFixedSize(120, 30)
         self.y_step_size_spinbox.setValue(value=0.05)
         layout.addWidget(self.y_step_size_spinbox, layout_row, 1)
@@ -157,7 +174,8 @@ class NanoWidget(QtWidgets.QWidget):
         def plus_y(button):
             read_y = self.nano.single_read_n(2, self.nano.handle)
             self.nano.monitor_n(read_y + self.y_step_size_spinbox.value(), 2, self.nano.handle)
-        plus_ybutton.clicked.connect(plus_y)
+        #plus_ybutton.clicked.connect(plus_y)
+        plus_ybutton.clicked.connect(lambda _: self.step_axis(2, +self.y_step_size_spinbox.value()))
         layout.addWidget(plus_ybutton, layout_row, 2)
         plus_ybutton.setFixedSize(60, 30)
         #plus_button.clicked.connect(lambda: self.position_spinbox.setValue(self.position_spinbox.value() + 0.003))
@@ -166,7 +184,8 @@ class NanoWidget(QtWidgets.QWidget):
         def minus_y(button):
             read_y = self.nano.single_read_n(2, self.nano.handle)
             self.nano.monitor_n(read_y - self.y_step_size_spinbox.value(), 2, self.nano.handle)
-        minus_ybutton.clicked.connect(minus_y)
+        #minus_ybutton.clicked.connect(minus_y)
+        minus_ybutton.clicked.connect(lambda _: self.step_axis(2, -self.y_step_size_spinbox.value()))
         layout.addWidget(minus_ybutton, layout_row, 3)
         minus_ybutton.setFixedSize(60, 30)
         #minus_button.clicked.connect(lambda: self.position_spinbox.setValue(self.position_spinbox.value() - 0.003))
@@ -175,7 +194,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # Z position spinbox
         layout.addWidget(QtWidgets.QLabel('Z-Position (um)'), layout_row, 0)
-        self.z_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-100.000, 100.000), step=0.003, dec=4, int=False)
+        self.z_position_spinbox = SpinBox(value=0, siPrefix=False, bounds=(-self.axis_centers[3], self.axis_centers[3]), step=0.003, dec=3, int=False)
         self.z_position_spinbox.setFixedSize(120, 30)
         self.z_position_spinbox.setValue(value=0)
         layout.addWidget(self.z_position_spinbox, layout_row, 1)
@@ -185,7 +204,7 @@ class NanoWidget(QtWidgets.QWidget):
         # button to move X position
         move_zbutton = QtWidgets.QPushButton('Move')
         def move_z(button):
-            self.nano.monitor_n(100 + (self.z_position_spinbox.value()), 3, self.nano.handle)
+            self.nano.monitor_n(self._user_to_hw(3, self.z_position_spinbox.value()), 3, self.nano.handle)
         move_zbutton.clicked.connect(move_z)
         layout.addWidget(move_zbutton, layout_row, 2)
 
@@ -193,7 +212,7 @@ class NanoWidget(QtWidgets.QWidget):
 
         # Step size spinbox
         layout.addWidget(QtWidgets.QLabel('Z Step Size (um)'), layout_row, 0)
-        self.z_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 200.000), step=0.003, dec=4, int=False)
+        self.z_step_size_spinbox = SpinBox(value=0.05, siPrefix=False, bounds=(0.000, 9.000), step=0.003, dec=3, int=False)
         self.z_step_size_spinbox.setFixedSize(120, 30)
         self.z_step_size_spinbox.setValue(value=0.05)
         layout.addWidget(self.z_step_size_spinbox, layout_row, 1)
@@ -202,7 +221,8 @@ class NanoWidget(QtWidgets.QWidget):
         def plus_z(button):
             read_z = self.nano.single_read_n(3, self.nano.handle)
             self.nano.monitor_n(read_z + self.z_step_size_spinbox.value(), 3, self.nano.handle)
-        plus_zbutton.clicked.connect(plus_z)
+        #plus_zbutton.clicked.connect(plus_z)
+        plus_zbutton.clicked.connect(lambda _: self.step_axis(3, +self.z_step_size_spinbox.value()))
         layout.addWidget(plus_zbutton, layout_row, 2)
         plus_zbutton.setFixedSize(60, 30)
         #plus_button.clicked.connect(lambda: self.position_spinbox.setValue(self.position_spinbox.value() + 0.003))
@@ -211,7 +231,8 @@ class NanoWidget(QtWidgets.QWidget):
         def minus_z(button):
             read_z = self.nano.single_read_n(3, self.nano.handle)
             self.nano.monitor_n(read_z - self.z_step_size_spinbox.value(), 3, self.nano.handle)
-        minus_zbutton.clicked.connect(minus_z)
+        #minus_zbutton.clicked.connect(minus_z)
+        minus_zbutton.clicked.connect(lambda _: self.step_axis(3, -self.z_step_size_spinbox.value()))
         layout.addWidget(minus_zbutton, layout_row, 3)
         minus_zbutton.setFixedSize(60, 30)
         #minus_button.clicked.connect(lambda: self.position_spinbox.setValue(self.position_spinbox.value() - 0.003))
@@ -222,9 +243,12 @@ class NanoWidget(QtWidgets.QWidget):
         home_button = QtWidgets.QPushButton('Home')
         def home_axes(button):
             # Move all axes to 100 um (hardware)
-            self.nano.monitor_n(100.0, 1, self.nano.handle)  # X
-            self.nano.monitor_n(100.0, 2, self.nano.handle)  # Y
-            self.nano.monitor_n(100.0, 3, self.nano.handle)  # Z
+            self.nano.monitor_n(self.axis_centers[1], 1, self.nano.handle)
+            self._update_axis_widgets(1, actual_x)
+            self.nano.monitor_n(self.axis_centers[2], 2, self.nano.handle)
+            self._update_axis_widgets(2, actual_y)
+            self.nano.monitor_n(self.axis_centers[3], 3, self.nano.handle)
+            self._update_axis_widgets(3, actual_z)
         home_button.clicked.connect(home_axes)
         layout.addWidget(home_button, layout_row, 0, 1, 2)  # Spans two columns for visibility
         layout_row += 1
@@ -239,5 +263,44 @@ class NanoWidget(QtWidgets.QWidget):
         except Exception as e:
             print(f"Error releasing Nano-Drive handle: {e}")
         super().closeEvent(event)
+
+    def _hw_to_user(self, axis, hw_value):
+            return float(hw_value) - self.axis_centers[axis]
+
+    def _user_to_hw(self, axis, user_value):
+            return float(user_value) + self.axis_centers[axis]
     
+    def _clamp_hw_target(self, axis, hw_target):
+        return max(0.0, min(self.axis_ranges[axis], float(hw_target)))
+    
+    def move_axis_to_user(self, axis, user_target):
+        hw_target = self._user_to_hw(axis, user_target)
+        hw_target = self._clamp_hw_target(axis, hw_target)
+        actual_hw = self.nano.monitor_n(hw_target, axis, self.nano.handle)
+        self._update_axis_widgets(axis, actual_hw)
+    
+    def step_axis(self, axis, delta_user):
+        current_hw = self.nano.single_read_n(axis, self.nano.handle)
+        hw_target = self._clamp_hw_target(axis, current_hw + float(delta_user))
+        actual_hw = self.nano.monitor_n(hw_target, axis, self.nano.handle)
+        self._update_axis_widgets(axis, actual_hw)
+
+    def _update_axis_widgets(self, axis, hw_value):
+        user_value = self._hw_to_user(axis, hw_value)
+        if axis == 1:
+            self.x_pos_box.setText(f"{user_value:.4f}")
+            self.x_position_spinbox.setValue(user_value)
+        elif axis == 2:
+            self.y_pos_box.setText(f"{user_value:.4f}")
+            self.y_position_spinbox.setValue(user_value)
+        elif axis == 3:
+            self.z_pos_box.setText(f"{user_value:.4f}")
+            self.z_position_spinbox.setValue(user_value)
+    
+    def _safe_call(self, func):
+        try:
+            return func()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Nano-Drive Error", str(e))
+            return None
         

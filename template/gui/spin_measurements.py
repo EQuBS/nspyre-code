@@ -160,6 +160,39 @@ class SpinMeasurements:
                 # Doing np.sum here will make the Y axis in the data plotting actually means "the total number of photons collected for all runs"
             #return sig_array, bg_array
             #return sig_array
+        elif exp_type == 'Pulsed':
+            sig = array[::2]
+            bg = array[1::2]
+
+            sig_scalar = np.mean(sig)
+            bg_scalar = np.mean(bg)
+
+            return sig_scalar, bg_scalar
+
+        elif  exp_type == 'Pulsed2':
+            s1_on = array[0::4]  # Ref1, 
+            s2_on = array[1::4]  # Ref2, 
+            s3_on = array[2::4]  # Sig1, 
+            s4_on = array[3::4]  # Sig2, 
+            
+            """ s1_on_array = np.ones(pts)
+            s2_on_array = np.ones(pts)
+            s3_on_array = np.ones(pts)
+            s4_on_array = np.ones(pts) """
+            
+            """ for i in range(pts):
+                s1_on_array[i] = np.mean(s1_on[i::pts])
+                s2_on_array[i] = np.mean(s2_on[i::pts])
+                s3_on_array[i] = np.mean(s3_on[i::pts])
+                s4_on_array[i] = np.mean(s4_on[i::pts]) """
+            
+            s1_on_scalar = np.mean(s1_on)
+            s2_on_scalar = np.mean(s2_on)
+            s3_on_scalar = np.mean(s3_on)
+            s4_on_scalar = np.mean(s4_on)
+            
+            return s1_on_scalar, s2_on_scalar, s3_on_scalar, s4_on_scalar
+
         elif exp_type == 'Rabi' or exp_type == 'T2' or exp_type == 'MW_T1' or exp_type == 'Correlation Spectroscopy':
             # Adaptation (by Rolando)
             #sig_all = diff_array[::2] # single integrated data point for each MW on/off window
@@ -169,10 +202,25 @@ class SpinMeasurements:
             sig_array = np.ones(pts) # bright data array
             bg_array = np.ones(pts) # dark data array
             for i in range(pts):
-                sig_array[i] = np.sum(sig_all[i::pts])
-                bg_array[i] = np.sum(bg_all[i::pts])
+                sig_array[i] = np.sum(float(sig_all[i::pts]))
+                bg_array[i] = np.sum(float(bg_all[i::pts]))
                 # Doing np.sum here will make the Y axis in the Rabi data plotting actually means "the total number of photons collected for all runs"
             return sig_array, bg_array
+        
+        elif exp_type == 'Rabi2':
+            # Adaptation (by Rolando)
+            #sig_all = diff_array[::2] # single integrated data point for each MW on/off window
+            #bg_all = diff_array[1::2]
+            sig_all = array[::2]
+            bg_all = array[1::2]
+            sig_array = np.ones(pts) # bright data array
+            bg_array = np.ones(pts) # dark data array
+            for i in range(pts):
+                sig_array[i] = np.mean(sig_all[i::pts])
+                bg_array[i] = np.mean(bg_all[i::pts])
+                # Doing np.mean here will make the Y axis in the Rabi data plotting actually means "the average number of photons collected for all runs"
+            return sig_array, bg_array
+        
         elif exp_type == 'DEER' or exp_type == 'DEER_CPMG':
             dark_ms1_all = diff_array[::8]
             dark_ms0_all = diff_array[2::8]
@@ -962,6 +1010,10 @@ class SpinMeasurements:
             signal_sweeps = StreamingList()
             background_sweeps = StreamingList()
             norm_sweeps = StreamingList()
+            s1_sweeps = StreamingList()
+            s2_sweeps = StreamingList()
+            s3_sweeps = StreamingList()
+            s4_sweeps = StreamingList()
 
             # We define parameters 
             dwell_time = int(kwargs['dwell_time']*1e9) # in nanoseconds
@@ -980,6 +1032,8 @@ class SpinMeasurements:
                 cw_odmr_seq = gw.ps.New_CW_ODMR_R(dwell_time, kwargs['CW_Buffer_Time'], kwargs['runs'])
             elif kwargs['odmr_type']=='Pulsed':
                 pul_odmr_seq = gw.ps.Pulsed_ODMR_R_2(kwargs['init_time']*1e9, kwargs['wait_time']*1e9, kwargs['pi_xy'], kwargs['probe_time']*1e9, kwargs['read_wait']*1e9, kwargs['read_time']*1e9, kwargs['seq_gap']*1e9)
+            elif kwargs['odmr_type']=='Pulsed2':
+                pul_odmr_seq2 = gw.ps.Pulsed_ODMR_R_3(kwargs['init_time']*1e9, kwargs['wait_time']*1e9, kwargs['pi_xy'], kwargs['probe_time']*1e9, kwargs['read_wait']*1e9, kwargs['read_time']*1e9)
             else:
                 raise ValueError("Invalid ODMR type")
 
@@ -1007,17 +1061,27 @@ class SpinMeasurements:
 
             sig_a = np.zeros(kwargs['num_points'])
             bg_a = np.zeros(kwargs['num_points'])
+            s1_a = np.zeros(kwargs['num_points'])
+            s2_a = np.zeros(kwargs['num_points'])
+            s3_a = np.zeros(kwargs['num_points'])
+            s4_a = np.zeros(kwargs['num_points'])
 
             # Enable Laser if the ODMR type is CW
             """ if kwargs['odmr_type'] == 'CW':
                 gw.ps.laser_on()
             else:   
                 pass """
+
+            #pulsed_bins = kwargs['runs'] * 2 #* kwargs['num_points'] # number of bins we expect to get from the Time Tagger for pulsed ODMR, since we have signal and background for each point, we multiply by 2
             
             for iter in range(kwargs['iterations']):
                 print(f"Iteration {iter + 1} of {kwargs['iterations']}")
                 sig = []
                 bg = []
+                s1_list = []
+                s2_list = []
+                s3_list = []
+                s4_list = []
                 time.sleep(0.01)
                 for f, freq in enumerate(frequencies):
                     gw.sg.set_frequency(freq)
@@ -1056,16 +1120,52 @@ class SpinMeasurements:
                         sig.append(sig_cps)  # cps, since bin_width is in ns, we convert it to s
                         bg.append(bg_cps)  # cps
                         # Count verification
-                        print("counter_data: ", counts)
+                        """ print("counter_data: ", counts)
                         print(f"Signal counts (cps): {sig_cps:.3f}")
-                        print(f"Background counts (cps): {bg_cps:.3f}")
+                        print(f"Background counts (cps): {bg_cps:.3f}") """
 
                     elif kwargs['odmr_type'] == 'Pulsed':
-                        runs = kwargs['runs']
-                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, runs*2)
+                        expected_bins = 2 * kwargs['runs']
+
+                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins) #pulsed_bins)
+                        gw.daq.cbm_clear()
                         gw.daq.CBM_start()
                         gw.daq.sync()
-                        gw.ps.stream(obtain(pul_odmr_seq), runs)
+                        gw.ps.stream(obtain(pul_odmr_seq), kwargs['runs'])
+                        
+                        ready = False
+                        while ready is False:
+                            ready = gw.daq.cbm_ready()
+
+                        counts = obtain(gw.daq.count_BM())
+                        binwidths = obtain(gw.daq.cbm_get_BinWidths())
+
+                        #print("Raw counts from Time Tagger: ", counts)
+                        #print("Bin widths from Time Tagger (s): ", binwidths)
+                        
+                        counts = np.asarray(counts, dtype=float)
+
+                        counts = np.asarray(counts, dtype=float)
+
+                        count_rate = counts / ((binwidths)*1e-12)
+
+                        sig_val, bg_val = self.digital_math(count_rate, 'Pulsed', kwargs['runs'])
+
+                        sig_val, bg_val = float(sig_val), float(bg_val)
+                        
+                        sig.append(sig_val)
+                        bg.append(bg_val)
+                        #############################################
+
+                    elif kwargs['odmr_type'] == 'Pulsed2':
+                        expected_bins = 4 * kwargs['runs']
+
+                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins) #pulsed_bins)
+                        gw.daq.cbm_clear()
+                        gw.daq.CBM_start()
+                        gw.daq.sync()
+                        gw.ps.stream(obtain(pul_odmr_seq2), kwargs['runs'])
+
                         ready = False
                         while ready is False:
                             ready = gw.daq.cbm_ready()
@@ -1073,30 +1173,52 @@ class SpinMeasurements:
                         counts = obtain(gw.daq.count_BM())
                         binwidths = obtain(gw.daq.cbm_get_BinWidths())
                         
+                        """ print("Array size for counts: ", counts.shape)
+                        print("Array size for binwidths: ", binwidths.shape) """
+
                         counts = np.asarray(counts, dtype=float)
 
-
-                        # cps
-                        # read_time_s = float(kwargs['read_time'])
-                        sig_cps = counts[0::2].sum() / (binwidths[0::2]*1e-12 * runs)  # cps
-                        bg_cps = counts[1::2].sum() / (binwidths[1::2]*1e-12 * runs)  # cps
+                        count_rate = counts / ((binwidths)*1e-12) #float()  # cps, since bin_width is in ns, we convert it to s
                         
-                        # Record of photon counts
-                        sig.append(np.mean(sig_cps))  # cps
-                        bg.append(np.mean(bg_cps))  # cps
+                        s1, s2, s3, s4 = self.digital_math(count_rate, 'Pulsed2', kwargs['runs'])
+
+                        s1, s2, s3, s4 = float(s1), float(s2), float(s3), float(s4)
+
+                        s1_list.append(s1)
+                        s2_list.append(s2)
+                        s3_list.append(s3)  # cps, since bin_width is in ns, we convert it to s
+                        s4_list.append(s4)
+
+                        sig.append(s3)  # cps, since bin_width is in ns, we convert it to s
+                        bg.append(s1)  # cps, since bin_width is in ns, we convert
 
                         # Count verification
-                        #print("counter_data: ", counts)
-                        #print(f"Signal counts (cps): {sig_cps}")
-                        #print(f"Background counts (cps): {bg_cps}")
+                        """ print("Verification of s windows")
+                        print(f"Signal counts (cps): {s3:.3f}")
+                        print(f"Background counts (cps): {s1:.3f}") """
 
                 # avg_data = (avg_data*iter + np.array(signal_sweeps))/(iter+1)
                 sig_a = (sig_a*iter + np.array(sig))/(iter+1) #sig_a = (sig_a*iter + np.array([float(x) for x in sig]))/(iter+1)
                 bg_a = (bg_a*iter + np.array(bg))/(iter+1)
 
+                if kwargs['odmr_type'] == 'Pulsed2':
+                    s1_a = (s1_a*iter + np.array(s1_list))/(iter+1)
+                    s2_a = (s2_a*iter + np.array(s2_list))/(iter+1)
+                    s3_a = (s3_a*iter + np.array(s3_list))/(iter+1)
+                    s4_a = (s4_a*iter + np.array(s4_list))/(iter+1)
+                else:
+                    s1_a = np.zeros(kwargs['num_points'])
+                    s2_a = np.zeros(kwargs['num_points'])
+                    s3_a = np.zeros(kwargs['num_points'])
+                    s4_a = np.zeros(kwargs['num_points'])
+
                 signal_sweeps.append(np.stack([frequencies/1e9, sig_a]))
                 background_sweeps.append(np.stack([frequencies/1e9, bg_a]))
                 norm_sweeps.append(np.stack([frequencies/1e9, sig_a/bg_a]))
+                s1_sweeps.append(np.stack([frequencies/1e9, s1_a]))
+                s2_sweeps.append(np.stack([frequencies/1e9, s2_a]))
+                s3_sweeps.append(np.stack([frequencies/1e9, s3_a]))
+                s4_sweeps.append(np.stack([frequencies/1e9, s4_a]))
                 # To use... RAFG 9/29/2025
                 # signal_sweeps.append(np.stack([frequencies/1e9, sig_a]))
                 # background_sweeps.append(np.stack([frequencies/1e9, bg_a]))
@@ -1105,6 +1227,10 @@ class SpinMeasurements:
                 signal_sweeps.updated_item(-1)
                 background_sweeps.updated_item(-1)
                 norm_sweeps.updated_item(-1)
+                s1_sweeps.updated_item(-1)
+                s2_sweeps.updated_item(-1)
+                s3_sweeps.updated_item(-1)
+                s4_sweeps.updated_item(-1)
 
                 # Data push 
                 odmr_data.push({'params': {'start': kwargs['start_freq'], 'stop': kwargs['stop_freq'], 'num_points': kwargs['num_points'], 'iterations': kwargs['iterations']},
@@ -1113,7 +1239,11 @@ class SpinMeasurements:
                                     'ylabel': 'Counts',
                                     'datasets': {'signal' : signal_sweeps,
                                                 'background': background_sweeps,
-                                                'norm' : norm_sweeps
+                                                'norm' : norm_sweeps,
+                                                's1': s1_sweeps,
+                                                's2': s2_sweeps,
+                                                's3': s3_sweeps,
+                                                's4': s4_sweeps
                                                 } #'frequencies': frequencies
                         })
 
@@ -1145,6 +1275,248 @@ class SpinMeasurements:
         gw.ps.ps_reset()
         #gw.daq.free_time_tagger()
         print("Measurement completed.")
+
+
+
+    def odmr_run_R2(self, **kwargs):  # by Rolando 4/6/2026
+        with InstrumentGateway() as gw, DataSource(kwargs['dataset']) as odmr_data:
+
+            np.set_printoptions(precision=6)
+
+            frequencies = np.linspace(kwargs['start_freq'], kwargs['stop_freq'], kwargs['num_points'])
+
+            signal_sweeps = StreamingList()
+            background_sweeps = StreamingList()
+            norm_sweeps = StreamingList()
+            s1_sweeps = StreamingList()
+            s2_sweeps = StreamingList()
+            s3_sweeps = StreamingList()
+            s4_sweeps = StreamingList()
+
+            dwell_time = int(kwargs['dwell_time'] * 1e9)  # ns
+
+            # Laser
+            gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['laser_power'])
+            gw.laser.on()
+
+            # Pulse Streamer sequences
+            if kwargs['odmr_type'] == 'CW':
+                # IMPORTANT: build ONE run here; we will repeat it with stream(..., kwargs['runs'])
+                cw_buffer_ns = int(kwargs['CW_Buffer_Time'] * 1e9)
+                if 2 * cw_buffer_ns >= dwell_time // 2:
+                    raise ValueError("CW_Buffer_Time is too large for the chosen dwell_time.")
+                cw_odmr_seq = gw.ps.New_CW_ODMR_R(dwell_time, kwargs['CW_Buffer_Time'], 1)
+
+            elif kwargs['odmr_type'] == 'Pulsed':
+                pul_odmr_seq = gw.ps.Pulsed_ODMR_R_2(
+                    kwargs['init_time'] * 1e9,
+                    kwargs['wait_time'] * 1e9,
+                    kwargs['pi_xy'],
+                    kwargs['probe_time'] * 1e9,
+                    kwargs['read_wait'] * 1e9,
+                    kwargs['read_time'] * 1e9,
+                    kwargs['seq_gap'] * 1e9,
+                )
+
+            elif kwargs['odmr_type'] == 'Pulsed2':
+                if 2 * kwargs['read_time'] > kwargs['init_time']:
+                    raise ValueError("Pulsed2 requires 2*read_time <= init_time.")
+                pul_odmr_seq2 = gw.ps.Pulsed_ODMR_R_3(
+                    kwargs['init_time'] * 1e9,
+                    kwargs['wait_time'] * 1e9,
+                    kwargs['pi_xy'],
+                    kwargs['probe_time'] * 1e9,
+                    kwargs['read_wait'] * 1e9,
+                    kwargs['read_time'] * 1e9,
+                )
+            else:
+                raise ValueError("Invalid ODMR type")
+
+            # Time Tagger channels / thresholds
+            tt_gate_ch = 1
+            tt_sync_ch = 2
+            tt_spcm_ch = 3
+
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)
+            gw.daq.set_trigger_level(tt_sync_ch, 1.3)
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.0)
+
+            # Signal generator
+            gw.sg.set_rf_amplitude(kwargs['mw_power'])
+            gw.sg.set_mod_type(6)       # IQ
+            gw.sg.set_qmod_function(5)  # external
+            gw.sg.set_mod_toggle(1)
+            gw.sg.set_rf_toggle(1)
+
+            def _read_cbm(expected_bins: int, label: str):
+                counts = np.asarray(obtain(gw.daq.count_BM()), dtype=np.float64).ravel()
+                binwidths = np.asarray(obtain(gw.daq.cbm_get_BinWidths()), dtype=np.float64).ravel()
+
+                if counts.size != expected_bins or binwidths.size != expected_bins:
+                    raise RuntimeError(
+                        f"{label}: expected {expected_bins} CBM bins, got "
+                        f"{counts.size} counts and {binwidths.size} widths."
+                    )
+
+                if np.any(binwidths <= 0):
+                    raise RuntimeError(f"{label}: non-positive CBM bin width encountered.")
+
+                return counts, binwidths
+
+            def _rate_cps(counts_slice: np.ndarray, widths_slice: np.ndarray) -> float:
+                # widths are in ps; convert to counts/s
+                return 1e12 * np.sum(counts_slice) / np.sum(widths_slice)
+
+            for iter in range(kwargs['iterations']):
+                print(f"Iteration {iter + 1} of {kwargs['iterations']}")
+
+                # RAW sweeps for this iteration only
+                sig = np.full(kwargs['num_points'], np.nan, dtype=float)
+                bg = np.full(kwargs['num_points'], np.nan, dtype=float)
+                s1_arr = np.zeros(kwargs['num_points'], dtype=float)
+                s2_arr = np.zeros(kwargs['num_points'], dtype=float)
+                s3_arr = np.zeros(kwargs['num_points'], dtype=float)
+                s4_arr = np.zeros(kwargs['num_points'], dtype=float)
+
+                # Simple anti-drift trick: alternate sweep direction every iteration
+                if iter % 2 == 0:
+                    freq_indices = range(kwargs['num_points'])
+                else:
+                    freq_indices = range(kwargs['num_points'] - 1, -1, -1)
+
+                time.sleep(0.01)
+
+                for f in freq_indices:
+                    freq = frequencies[f]
+                    gw.sg.set_frequency(freq)
+                    time.sleep(0.005)
+
+                    if kwargs['odmr_type'] == 'CW':
+                        expected_bins = 2 * kwargs['runs']
+
+                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                        gw.daq.cbm_clear()
+                        gw.daq.CBM_start()
+                        gw.daq.sync()
+
+                        # Sequence was built for ONE run, so repeat it here
+                        gw.ps.stream(obtain(cw_odmr_seq), kwargs['runs'])
+
+                        while not gw.daq.cbm_ready():
+                            time.sleep(0.001)
+
+                        counts, binwidths = _read_cbm(expected_bins, 'CW ODMR')
+
+                        sig[f] = _rate_cps(counts[0::2], binwidths[0::2])
+                        bg[f] = _rate_cps(counts[1::2], binwidths[1::2])
+
+                    elif kwargs['odmr_type'] == 'Pulsed':
+                        expected_bins = 2 * kwargs['runs']
+
+                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                        gw.daq.cbm_clear()
+                        gw.daq.CBM_start()
+                        gw.daq.sync()
+                        gw.ps.stream(obtain(pul_odmr_seq), kwargs['runs'])
+
+                        while not gw.daq.cbm_ready():
+                            time.sleep(0.001)
+
+                        counts, binwidths = _read_cbm(expected_bins, 'Pulsed ODMR')
+
+                        sig[f] = _rate_cps(counts[0::2], binwidths[0::2])
+                        bg[f] = _rate_cps(counts[1::2], binwidths[1::2])
+
+                    elif kwargs['odmr_type'] == 'Pulsed2':
+                        expected_bins = 4 * kwargs['runs']
+
+                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                        gw.daq.cbm_clear()
+                        gw.daq.CBM_start()
+                        gw.daq.sync()
+                        gw.ps.stream(obtain(pul_odmr_seq2), kwargs['runs'])
+
+                        while not gw.daq.cbm_ready():
+                            time.sleep(0.001)
+
+                        counts, binwidths = _read_cbm(expected_bins, 'Pulsed2 ODMR')
+
+                        s1_arr[f] = _rate_cps(counts[0::4], binwidths[0::4])
+                        s2_arr[f] = _rate_cps(counts[1::4], binwidths[1::4])
+                        s3_arr[f] = _rate_cps(counts[2::4], binwidths[2::4])
+                        s4_arr[f] = _rate_cps(counts[3::4], binwidths[3::4])
+
+                        # Keep current semantics:
+                        sig[f] = s3_arr[f]
+                        bg[f] = s1_arr[f]
+
+                        # If your intended 4-window protocol is symmetric, use this instead:
+                        # sig[f] = 0.5 * (s3_arr[f] + s4_arr[f])
+                        # bg[f] = 0.5 * (s1_arr[f] + s2_arr[f])
+
+                    if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                        gw.sg.set_rf_toggle(0)
+                        gw.sg.set_mod_toggle(0)
+                        gw.ps.ps_reset()
+                        gw.laser.get_power()
+                        gw.laser.set_power(0)
+                        gw.ps.just_gate_off()
+                        gw.laser.off()
+                        print('the GUI has asked us nicely to exit')
+                        return
+
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    norm = np.where(bg != 0, sig / bg, np.nan)
+
+                # Append RAW sweeps, not cumulative averages
+                signal_sweeps.append(np.stack([frequencies / 1e9, sig]))
+                background_sweeps.append(np.stack([frequencies / 1e9, bg]))
+                norm_sweeps.append(np.stack([frequencies / 1e9, norm]))
+                s1_sweeps.append(np.stack([frequencies / 1e9, s1_arr]))
+                s2_sweeps.append(np.stack([frequencies / 1e9, s2_arr]))
+                s3_sweeps.append(np.stack([frequencies / 1e9, s3_arr]))
+                s4_sweeps.append(np.stack([frequencies / 1e9, s4_arr]))
+
+                signal_sweeps.updated_item(-1)
+                background_sweeps.updated_item(-1)
+                norm_sweeps.updated_item(-1)
+                s1_sweeps.updated_item(-1)
+                s2_sweeps.updated_item(-1)
+                s3_sweeps.updated_item(-1)
+                s4_sweeps.updated_item(-1)
+
+                odmr_data.push({
+                    'params': {
+                        'start': kwargs['start_freq'],
+                        'stop': kwargs['stop_freq'],
+                        'num_points': kwargs['num_points'],
+                        'iterations': kwargs['iterations'],
+                    },
+                    'title': 'Optically Detected Magnetic Resonance',
+                    'xlabel': 'Frequency (GHz)',
+                    'ylabel': 'Counts',
+                    'datasets': {
+                        'signal': signal_sweeps,
+                        'background': background_sweeps,
+                        'norm': norm_sweeps,
+                        's1': s1_sweeps,
+                        's2': s2_sweeps,
+                        's3': s3_sweeps,
+                        's4': s4_sweeps,
+                    },
+                })
+
+            gw.sg.set_mod_toggle(0)
+            gw.sg.set_rf_toggle(0)
+            gw.laser.get_power()
+            gw.laser.set_power(0)
+            gw.ps.just_gate_off()
+            gw.laser.off()
+            gw.ps.constant_off()
+            gw.ps.ps_reset()
+            print("Measurement completed.")
 
     def pulsed_calibration_run(self, **kwargs):
         """
@@ -1999,9 +2371,57 @@ class SpinMeasurements:
 
                 for iter in range(kwargs['iters']):
 
-                    #rabi_sig_list = []
-                    #rabi_bg_list = []
+                    # Following code belongs to Rabi test implemented 4/6/2026 by Rolando
+                    ##########################################
+                    mw_times_copy = mw_times.copy()
+                    np.random.shuffle(mw_times_copy) # random shuffle the mw_times for balancing the heating and charge of the sample
+                    index_order = np.argsort(mw_times_copy)
 
+                    ps_seq = gw.ps.Rabi_R(
+                        mw_times_copy,
+                        kwargs['pi_xy'],
+                        kwargs['init_time']*1e9,
+                        kwargs['read_time']*1e9,
+                        kwargs['wait_time']*1e9,
+                        kwargs['read_wait']*1e9,
+                        kwargs['seq_gap']*1e9
+                    )
+
+                    expected_bins = 2 * kwargs['runs'] * kwargs['num_pts']
+                    gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                    gw.daq.cbm_clear()
+                    gw.daq.CBM_start()
+                    gw.daq.sync()
+                    gw.ps.stream(obtain(ps_seq), kwargs['runs'])
+
+                    while not gw.daq.cbm_ready():
+                        pass
+
+                    counts = np.asarray(obtain(gw.daq.count_BM()), dtype=np.float64)
+                    widths = np.asarray(obtain(gw.daq.cbm_get_BinWidths()), dtype=np.float64)
+
+                    if counts.size != expected_bins or widths.size != expected_bins:
+                        raise RuntimeError("Unexpected CBM size")
+                    
+                    sig_counts = counts[0::2].reshape(kwargs['runs'], kwargs['num_pts'])
+                    bg_counts  = counts[1::2].reshape(kwargs['runs'], kwargs['num_pts'])
+                    sig_widths = widths[0::2].reshape(kwargs['runs'], kwargs['num_pts'])
+                    bg_widths  = widths[1::2].reshape(kwargs['runs'], kwargs['num_pts'])
+
+                    rabi_sig = 1e12 * sig_counts.sum(axis=0) / sig_widths.sum(axis=0)
+                    rabi_bg  = 1e12 * bg_counts.sum(axis=0) / bg_widths.sum(axis=0)
+
+                    rabi_sig = rabi_sig[index_order]
+                    rabi_bg  = rabi_bg[index_order]
+
+                    signal_sweeps.append(np.stack([mw_times_ordered, rabi_sig]))
+                    background_sweeps.append(np.stack([mw_times_ordered, rabi_bg]))
+
+                    ###################################################
+
+
+                    # Method used before 4/6/2026, Commented by Rolando (test will be run)
+                    """
                     expected_bins = 2 * kwargs['runs'] * kwargs['num_pts']
 
                     gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
@@ -2019,45 +2439,33 @@ class SpinMeasurements:
                         ready = gw.daq.cbm_ready()
                     
                     rabi_result = obtain(gw.daq.count_BM())
-                    binwidths = obtain(gw.daq.cbm_get_BinWidths())#*1e-12  # convert bin widths from picoseconds to seconds """
+                    binwidths = obtain(gw.daq.cbm_get_BinWidths())#*1e-12  # convert bin widths from picoseconds to seconds
 
-                    #print("expected_bins:", expected_bins)
-                    #print("len(count_BM):", len(rabi_result))
-                    #print("len(binwidths):", len(binwidths))
 
-                    rabi_sig_raw, rabi_bg_raw = self.digital_math(rabi_result, 'Rabi', kwargs['num_pts'])
-                    sig_bins, bg_bins = self.digital_math(binwidths, 'Rabi', kwargs['num_pts'])
+                    rabi = (rabi_result / binwidths) * 1e12
 
-                    #sig_bins, bg_bins = sig_bins/kwargs['runs'], bg_bins/kwargs['runs']
 
-                    # Convert to countrates per second (cps) if we have the bin widths available
-                    #epsilon = 1e-12  # small constant to prevent division by zero
-                    rabi_sig = (rabi_sig_raw / sig_bins) * 1e12  # convert to counts per second (cps) 
-                    rabi_bg = (rabi_bg_raw / bg_bins) * 1e12  # convert to counts per second (cps)
+                    # Using 'Rabi2' in digital_math as a test 3/27/2026
+                    rabi_sig_raw, rabi_bg_raw = self.digital_math(rabi, 'Rabi2', kwargs['num_pts'])
 
+
+                    rabi_sig = rabi_sig_raw #* 1e12  # convert to counts per second (cps)
+                    rabi_bg = rabi_bg_raw #* 1e12  # convert to counts per second (cps)
 
                     # correct the y-axis data ordering for plots
                     rabi_sig = np.array([rabi_sig[i] for i in index_order])
                     rabi_bg = np.array([rabi_bg[i] for i in index_order])
 
-                    # Averaging over iterations
-                    #rabi_sig_list.append(rabi_sig)
-                    
-                    #rabi_bg_list.append(rabi_bg)
-                    #print("sig shape", sig_array.shape)
-
-                    #print("Iteration number\n", iter)
-                    #print("current sig \n", rabi_sig)
                     
                     #print("sig_array before averaging\n", rabi_sig_a)
                     rabi_sig_a = (rabi_sig_a*iter + rabi_sig) / (iter + 1)  # rabi_sig_a = (rabi_sig_a*iter + np.array(rabi_sig_list)) / (iter + 1)
                     #print("sig_array after averaging\n", rabi_sig_a)
                     rabi_bg_a = (rabi_bg_a*iter + rabi_bg) / (iter + 1)      # rabi_bg_a = (rabi_bg_a*iter + np.array(rabi_bg_list)) / (iter + 1)
-
-                    
-
                     signal_sweeps.append(np.stack([mw_times_ordered, rabi_sig_a]))
                     background_sweeps.append(np.stack([mw_times_ordered, rabi_bg_a]))
+                    """
+                
+                    
                     signal_sweeps.updated_item(-1)
                     background_sweeps.updated_item(-1)
 
@@ -2093,6 +2501,157 @@ class SpinMeasurements:
             #print("Sum of background counts in all runs\n", bg_array)
             #print("Sum of signal capture durations in all runs [ps]\n", sig_bins)
             #print("Sum of background capture durations in all runs [ps]\n", bg_bins)
+
+            # We turn OFF the mw signal (modulation and amplitude)        
+            gw.sg.set_rf_toggle(0)
+            gw.sg.set_mod_toggle(0)
+            gw.laser.off()
+            gw.laser.get_power()
+            gw.laser.set_power(0)
+            gw.ps.ps_reset()
+            # gw.daq.free_time_tagger()
+            # if kwargs['rabi_type'] == "SRS":
+
+    def rabi_run_R3(self, **kwargs):  # Rolando version
+        
+        with InstrumentGateway() as gw, DataSource("Rabi") as rabi_data:
+            
+            np.set_printoptions(precision=6)
+
+            # pi pulse durations that will be swept over in the Rabi measurement (converted to ns)
+            mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
+
+            signal_sweeps = StreamingList()
+            background_sweeps = StreamingList()
+
+            np.random.shuffle(mw_times) # random shuffel the mw_times for balancing the heating and charge of the sample
+            print("MW times after random shuffle:", mw_times)
+                        
+            # set initial parameters for instrument server devices
+            # Turn on the laser
+            gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['laser_power']) # set laser power to 10%
+            gw.laser.on()
+
+            """ Time Tagger Channel, Trigger Level and Counting Event Setup """
+            tt_gate_ch = 1
+            #tt_sync_ch = 2
+            tt_spcm_ch = 3
+
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)   # Gate channel trigger level
+            #gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.0)   # SPCM channel trigger level
+
+
+            # Setup the MW
+            gw.sg.set_frequency(kwargs['freq'])
+            gw.sg.set_rf_amplitude(kwargs['rf_power'])
+            gw.sg.set_mod_type(6)
+            gw.sg.set_qmod_function(5)
+            gw.sg.set_mod_toggle(1)
+            gw.sg.set_rf_toggle(1)
+
+            
+            # pulse streamer sequence
+            print("USING SRS FOR RABI MEASUREMENT.")
+            ps_seq = gw.ps.Rabi_R(
+                mw_times,
+                kwargs['pi_xy'],
+                kwargs['init_time']*1e9,
+                kwargs['read_time']*1e9,
+                kwargs['wait_time']*1e9,
+                kwargs['read_wait']*1e9,
+                kwargs['seq_gap']*1e9
+            )
+
+            index_order = np.argsort(mw_times) 
+            mw_times_ordered = np.sort(mw_times) # record the ordered mw_times for Rabi plotting
+
+            rabi_sig_a = np.zeros(kwargs['num_pts'])
+            rabi_bg_a = np.zeros(kwargs['num_pts'])
+
+            with tqdm(total = kwargs['iters']) as pbar:
+
+                for iter in range(kwargs['iters']):
+
+                    # Following code belongs to Rabi test implemented 4/6/2026 by Rolando
+                    ##########################################
+                    mw_times_copy = mw_times.copy()
+                    np.random.shuffle(mw_times_copy) # random shuffle the mw_times for balancing the heating and charge of the sample
+                    index_order = np.argsort(mw_times_copy)
+
+                    ps_seq = gw.ps.Rabi_R(
+                        mw_times_copy,
+                        kwargs['pi_xy'],
+                        kwargs['init_time']*1e9,
+                        kwargs['read_time']*1e9,
+                        kwargs['wait_time']*1e9,
+                        kwargs['read_wait']*1e9,
+                        kwargs['seq_gap']*1e9
+                    )
+
+                    expected_bins = 2 * kwargs['runs'] * kwargs['num_pts']
+                    gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                    gw.daq.cbm_clear()
+                    gw.daq.CBM_start()
+                    gw.daq.sync()
+                    gw.ps.stream(obtain(ps_seq), kwargs['runs'])
+
+                    while not gw.daq.cbm_ready():
+                        pass
+
+                    counts = np.asarray(obtain(gw.daq.count_BM()), dtype=np.float64)
+                    widths = np.asarray(obtain(gw.daq.cbm_get_BinWidths()), dtype=np.float64)
+
+                    if counts.size != expected_bins or widths.size != expected_bins:
+                        raise RuntimeError("Unexpected CBM size")
+                    
+                    sig_counts = counts[0::2].reshape(kwargs['runs'], kwargs['num_pts'])
+                    bg_counts  = counts[1::2].reshape(kwargs['runs'], kwargs['num_pts'])
+                    sig_widths = widths[0::2].reshape(kwargs['runs'], kwargs['num_pts'])
+                    bg_widths  = widths[1::2].reshape(kwargs['runs'], kwargs['num_pts'])
+
+                    rabi_sig = 1e12 * sig_counts.sum(axis=0) / sig_widths.sum(axis=0)
+                    rabi_bg  = 1e12 * bg_counts.sum(axis=0) / bg_widths.sum(axis=0)
+
+                    rabi_sig = rabi_sig[index_order]
+                    rabi_bg  = rabi_bg[index_order]
+
+                    signal_sweeps.append(np.stack([mw_times_ordered, rabi_sig]))
+                    background_sweeps.append(np.stack([mw_times_ordered, rabi_bg]))
+
+                    ###################################################
+
+                    signal_sweeps.updated_item(-1)
+                    background_sweeps.updated_item(-1)
+
+                    rabi_data.push({
+                        'params': {
+                            'mw_num': kwargs['num_pts'],
+                            'iter_num': kwargs['iters'],
+                            'runs_num': kwargs['runs'],
+                            'freq': kwargs['freq'],
+                            'rf_power': kwargs['rf_power']
+                        },
+                            'title': 'Rabi',                       
+                            'xlabel': 'MW Time (ns)',
+                            'ylabel': 'Counts',
+                            'datasets': {
+                                'signal' : signal_sweeps,
+                                'background': background_sweeps
+                            }
+                    })
+                    if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                        gw.sg.set_rf_toggle(0)
+                        gw.sg.set_mod_toggle(0)
+                        gw.ps.ps_reset()
+                        gw.laser.get_power()
+                        gw.laser.off()
+                        gw.laser.set_power(0)
+                        print('the GUI has asked us nicely to exit')
+                        return  
+                    pbar.update(1)
 
             # We turn OFF the mw signal (modulation and amplitude)        
             gw.sg.set_rf_toggle(0)

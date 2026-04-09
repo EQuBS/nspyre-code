@@ -18,6 +18,7 @@ from nspyre import DataSink
 from pyqtgraph import SpinBox
 from pyqtgraph.Qt import QtWidgets
 from . import spin_measurements as sm
+from .fit_helpers import average_trace, fit_odmr_trace
 # import the experiment 
 import sys
 sys.path.append('../experiments')
@@ -187,7 +188,7 @@ class ODMR_Widget(ExperimentWidget):
         super().__init__(params_config, 
                         sm,  # No specific measurements class
                         'SpinMeasurements',  # No specific class name
-                        'odmr_run_R',  # No specific run method
+                        'odmr_run_R2',  # No specific run method
                         title='ODMR')\
 
 """                        
@@ -208,25 +209,66 @@ def process_ODMR_data(sink: DataSink):
     div_sweeps = []
     divnow_sweeps = []
     norm_sweeps = [] #create normalization plot -A.K 11/19/2025
+    s1 = []
+    s2 = []
+    s3 = []
+    s4 = []
+
     for s,_ in enumerate(sink.datasets['signal']):
         freqs = sink.datasets['signal'][s][0]
         sig = sink.datasets['signal'][s][1]
         bg = sink.datasets['background'][s][1]
+        s1_data = sink.datasets['s1'][s][1] 
+        s2_data = sink.datasets['s2'][s][1]  
+        s3_data = sink.datasets['s3'][s][1]
+        s4_data = sink.datasets['s4'][s][1]
+        
+        s1.append(np.stack([freqs, s1_data]))
+        s2.append(np.stack([freqs, s2_data]))
+        s3.append(np.stack([freqs, s3_data]))
+        s4.append(np.stack([freqs, s4_data]))
 
         # Avoid division by zero or invalid values
         # sig[sig == 0] = np.nan
+        bg = bg.astype(float)
         bg[bg == 0] = np.nan
 
         diff_sweeps.append(np.stack([freqs, sig - bg]))
         div_sweeps.append(np.stack([freqs, sig/bg]))
-
-        norm_sweeps.append(np.stack([freqs, (sig-bg)/bg]))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            norm = np.where(bg != 0, sig / bg, np.nan) #Updated by Rolando 3/31/2026 to handle division by zero more gracefully
+            #norm = np.where(bg > 0, sig / bg, np.nan)
+        norm_sweeps.append(np.stack([freqs, norm]))
         #divnow_sweeps.append(np.stack([freqs, np.mean(sink.datasets['signal'][:s][1],axis=0)/np.mean(sink.datasets['background'][:s][1],axis=0)]))
+
+
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['div'] = div_sweeps
     sink.datasets['div_now'] = divnow_sweeps
     sink.datasets['norm'] = norm_sweeps
     #print("FF")
+
+    # Fit the averaged normalized ODMR trace. Added by Rolando A. Fimbres G. 3/30/2026
+    """sink.datasets['odmr_fit'] = []
+    if norm_sweeps:
+        x_avg, y_avg = average_trace(norm_sweeps)
+        fit_res = fit_odmr_trace(x_avg, y_avg, n_dips=2)
+        if fit_res is not None:
+            sink.datasets['odmr_fit'] = [fit_res['curve']]
+    """ 
+    sink.datasets['odmr_fit'] = []
+    if sink.datasets['signal'] and sink.datasets['background']:
+        x_sig, y_sig = average_trace(sink.datasets['signal'])
+        x_bg, y_bg = average_trace(sink.datasets['background'])
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            y_norm = np.where(y_bg != 0, y_sig / y_bg, np.nan)
+
+        valid = np.isfinite(y_norm)
+        if np.count_nonzero(valid) > 4:
+            fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=2)
+            if fit_res is not None:
+                sink.datasets['odmr_fit'] = [fit_res['curve']] 
 
 class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""
@@ -236,6 +278,18 @@ class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
         self.add_plot('sig_avg',        series='signal',   scan_i='',     scan_j='',  processing='Average')
         self.add_plot('bg_avg',         series='background',   scan_i='',     scan_j='',  processing='Average')
         self.add_plot('norm_avg',       series='norm',  scan_i='',      scan_j='',  processing='Average') # add normalized plot to main plots -A.K 11/19/2025
+
+        self.add_plot('odmr_fit', series = 'odmr_fit', scan_i='', scan_j='', processing='Average') # Added by Rolando A. Fimbres G. 3/30/2026
+        self.hide_plot('odmr_fit')
+
+        self.add_plot('s1_avg',        series='s1',  scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('s2_avg',        series='s2',  scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('s3_avg',        series='s3',  scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('s4_avg',        series='s4',  scan_i='',     scan_j='',  processing='Average')
+        self.hide_plot('s1_avg')
+        self.hide_plot('s2_avg')
+        self.hide_plot('s3_avg')
+        self.hide_plot('s4_avg')
 
         self.add_plot('div_avg',       series='div',  scan_i='',      scan_j='',  processing='Average')
         self.hide_plot('div_avg')

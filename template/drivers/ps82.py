@@ -462,10 +462,8 @@ class PS82():
         return seq_on.getDuration() """
 
     def New_CW_ODMR_R(self, dwell_time, buffer_time, runs):
-        
         """
         New_CW_ODMR_R
-        
         :param self: Description
         :param dwell_time: Duration of a single measurement point
         :param buffer_time: Buffer time (off) before and after the readout window
@@ -476,7 +474,6 @@ class PS82():
           of the loop and only turning it off after the loop has ended.
 
         """
-
         cw_seq = self.ps.createSequence()
         #seq_off = self.ps.createSequence()
         buffer_time = int(buffer_time*1e9) # convert to ns
@@ -624,6 +621,60 @@ class PS82():
         seqs = SinglePulsed_ODMR_R()
 
         return seqs
+
+    def Pulsed_ODMR_R_3(self, init_time, wait_time, pi_xy, mw_time, read_wait, read_time):
+        
+        self.laser_lag = 90
+        # opt_lag = self.laser_lag + lag_timing
+        init_time = int(init_time)
+        wait_time = int(wait_time)
+        mw_time = int(mw_time)
+        read_wait = int(read_wait)
+        read_time = int(read_time)
+        
+        if pi_xy == 'x':
+            self.IQ_ON = self.IQpx
+        elif pi_xy == 'y':
+            self.IQ_ON = self.IQpy
+        else:
+            raise ValueError("pi_xy must be 'x' or 'y'!")
+        self.IQ_OFF = self.IQ0
+
+        def single_pulsed_odmr():
+            seq_on = self.ps.createSequence()
+            #seq_off = self.ps.createSequence()
+
+            cycle_duration = init_time + wait_time + mw_time + read_wait + init_time
+            laser_off = cycle_duration - 2*init_time
+            mw_off1 = init_time + wait_time
+            mw_off2 = read_wait + init_time
+            read_off1 = init_time - 2*read_time
+            read_off2 = laser_off 
+
+            spcm_gate = [(cycle_duration +  laser_off, 1)]
+            laser_patt = [(init_time, 1), (laser_off, 0), (init_time, 1), (laser_off, 0)]
+            mw_I_patt_ON = [(mw_off1, self.IQ_OFF[0]), (mw_time, self.IQ_ON[0]), (mw_off2, self.IQ_OFF[0]), (laser_off, self.IQ_OFF[0])]
+            mw_Q_patt_ON = [(mw_off1, self.IQ_OFF[1]), (mw_time, self.IQ_ON[1]), (mw_off2, self.IQ_OFF[1]), (laser_off, self.IQ_OFF[1])]
+            #mw_I_patt_OFF = [(mw_off1, self.IQ_OFF[0]), (mw_time, self.IQ_OFF[0]), (mw_off2, self.IQ_OFF[0])]
+            #mw_Q_patt_OFF = [(mw_off1, self.IQ_OFF[1]), (mw_time, self.IQ_OFF[1]), (mw_off2, self.IQ_OFF[1])]
+            read_patt = [(read_time, 1), (read_off1, 0), (read_time, 1), (read_off2, 0), (read_time, 1), (read_off1, 0), (read_time, 1), (read_off2, 0)]
+
+            # Sequence ON
+            seq_on.setDigital(self.channel_r["spcm_gate"], spcm_gate)
+            seq_on.setDigital(self.channel_r["laser"], laser_patt)
+            seq_on.setDigital(self.channel_r["vrt_gate"], read_patt)
+            seq_on.setAnalog(0, mw_I_patt_ON)
+            seq_on.setAnalog(1, mw_Q_patt_ON)
+            
+
+            return seq_on 
+        
+        seqs = self.ps.createSequence()
+        seqs = single_pulsed_odmr()
+
+        return seqs
+            
+
 
 
     def Rabi(self, params, pi_xy, init_time, read_time, wait_time, read_wait, seq_gap):
@@ -1022,6 +1073,24 @@ class PS82():
         print('Rabi sequence created!')
         print('sequence time for 1 run is (ns):',seqs_total_time) 
         return seqs
+
+    def cw_odmr_test(self, runs, probe_time):
+
+        #read_time = int(probe_time) - 2 
+
+        cw_seq = self.ps.createSequence()
+        laser_patt = [(int(probe_time)*2, 1)]*runs
+        spcm_patt = [(int(probe_time)*2, 1)]*runs
+        mw_I_patt = [(int(probe_time), self.IQpx[0]), (int(probe_time), self.IQ0[0])]*runs # 100 ns mw buffer time
+        mw_Q_patt = [(int(probe_time), self.IQpx[1]), (int(probe_time), self.IQ0[1])]*runs
+        read_patt = [(int(probe_time)-2, 1), (2, 0), (int())]*runs
+
+        cw_seq.setDigital(self.channel_r['laser'], laser_patt)
+        cw_seq.setDigital(self.channel_r['spcm_gate'], spcm_patt)
+        cw_seq.setAnalog(0, mw_I_patt)
+        cw_seq.setAnalog(1, mw_Q_patt)
+
+        return cw_seq
 
     def rabi_R2(self, tau, pi_xy, init_time, read_time, wait_time, read_wait):
         '''

@@ -15,6 +15,7 @@ from nspyre import ExperimentWidget
 from nspyre import DataSink
 from pyqtgraph import SpinBox
 from pyqtgraph.Qt import QtWidgets
+from .fit_helpers import average_trace, fit_rabi_trace
 
 #import the experiment spyrelet file
 import sys
@@ -178,27 +179,44 @@ class RabiWidget(ExperimentWidget):
         super().__init__(params_config, 
                         sm,
                         'SpinMeasurements',
-                        'rabi_run_R',
+                        'rabi_run_R3',
                         title='Rabi')
 
 def process_Rabi_data(sink: DataSink):
     """Subtract the signal from background trace and add it as a new 'diff' dataset."""
     diff_sweeps = []
     contrast_sweeps = []
+    normalized_diff_sweeps = []
     #print('\n datasets[signal] now', sink.datasets['signal'])
     #print('\n datasets[background] now', sink.datasets['background'])
+
     for s,_ in enumerate(sink.datasets['signal']):
         mw_times = sink.datasets['signal'][s][0]
         sig = sink.datasets['signal'][s][1]
         bg = sink.datasets['background'][s][1]
         diff_sweeps.append(np.stack([mw_times, sig - bg]))
+
         with np.errstate(divide='ignore', invalid='ignore'):
             contrast = (sig - bg) / (sig + bg)
             contrast = np.where(np.isfinite(contrast), contrast, 0)  # or use 0 instead of np.nan if preferred
+            norm_diff = (sig - bg) / bg
+            norm_diff = np.where(np.isfinite(norm_diff), norm_diff, np.nan)
+
         contrast_sweeps.append(np.stack([mw_times, contrast]))
-        #div_sweeps.append(np.stack([mw_times, sig/bg]))
+        #normalized_diff = np.stack([mw_times, (sig - bg) / bg])
+        normalized_diff_sweeps.append(np.stack([mw_times, norm_diff]))
+
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['contrast'] = contrast_sweeps
+    sink.datasets['normalized_diff'] = normalized_diff_sweeps
+
+    # Fit the averaged Rabi contrast trace
+    sink.datasets['rabi_fit'] = []
+    if contrast_sweeps:
+        x_avg, y_avg = average_trace(contrast_sweeps)
+        fit_res = fit_rabi_trace(x_avg, y_avg)
+        if fit_res is not None:
+            sink.datasets['rabi_fit'] = [fit_res['curve']]
 
 class FlexLinePlotWidgetWithRabi(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""
@@ -211,6 +229,12 @@ class FlexLinePlotWidgetWithRabi(FlexLinePlotWidget):
         self.hide_plot('contrast_avg')
         self.add_plot('diff_avg',       series='diff',  scan_i='',      scan_j='',  processing='Average')
         self.hide_plot('diff_avg')
+        self.add_plot('normalized_diff_avg', series='normalized_diff', scan_i='', scan_j='', processing='Average')
+        self.hide_plot('normalized_diff_avg')
+
+        self.add_plot('rabi_fit', series='rabi_fit', scan_i='', scan_j='', processing='Average') # Added by Rolando A. Fimbres G. 3/30/2026
+        self.hide_plot('rabi_fit')
+
 
         # create some plots that not frequently used, so we hide them
         self.add_plot('sig_latest',     series='signal',   scan_i='-1',   scan_j='',  processing='Average')
