@@ -256,19 +256,35 @@ def process_ODMR_data(sink: DataSink):
         if fit_res is not None:
             sink.datasets['odmr_fit'] = [fit_res['curve']]
     """ 
-    sink.datasets['odmr_fit'] = []
-    if sink.datasets['signal'] and sink.datasets['background']:
-        x_sig, y_sig = average_trace(sink.datasets['signal'])
-        x_bg, y_bg = average_trace(sink.datasets['background'])
+    # Following line added to ensure the fit is applied after 
+    # a few sweeps have been collected, 
+    # and to attempt a single dip fit if the 2 dip fit fails. Rolando A. Fimbres G. 4/9/2026
 
-        with np.errstate(divide='ignore', invalid='ignore'):
-            y_norm = np.where(y_bg != 0, y_sig / y_bg, np.nan)
+    if len(sink.datasets['signal']) >= 3 and len(sink.datasets['background']) >= 3:
 
-        valid = np.isfinite(y_norm)
-        if np.count_nonzero(valid) > 4:
-            fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=2)
-            if fit_res is not None:
-                sink.datasets['odmr_fit'] = [fit_res['curve']] 
+        sink.datasets['odmr_fit'] = []
+        if sink.datasets['signal'] and sink.datasets['background']:
+            x_sig, y_sig = average_trace(sink.datasets['signal'])
+            x_bg, y_bg = average_trace(sink.datasets['background'])
+
+            with np.errstate(divide='ignore', invalid='ignore'):
+                y_norm = np.where(y_bg != 0, y_sig / y_bg, np.nan)
+
+            # Commented to update and NOT force '2 dips' fit. Rolando A. Fimbres G. 4/9/2026
+            """ valid = np.isfinite(y_norm)
+            if np.count_nonzero(valid) > 4:
+                fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=2)
+                if fit_res is not None:
+                    sink.datasets['odmr_fit'] = [fit_res['curve']]  """
+            valid = np.isfinite(y_norm)
+            if np.count_nonzero(valid) > 8:
+                fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=2)
+                if fit_res is None:
+                    fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=1)
+
+                if fit_res is not None:
+                    sink.datasets['odmr_fit'] = [fit_res['curve']]
+        
 
 class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""

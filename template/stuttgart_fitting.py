@@ -62,17 +62,36 @@ def run_sum(y, n=10):
 # non-linear least square fitting 
 ########################################################
 
-def fit(x, y, model, estimator):
-	"""Perform least-squares fit of two dimensional data (x,y) to model 'Model' using Levenberg-Marquardt algorithm.\n
+# Commented 4/9/2026 to allow a larger iteration 'budget'. Rolando A. Fimbres G.
+""" def fit(x, y, model, estimator):
+	Perform least-squares fit of two dimensional data (x,y) to model 'Model' using Levenberg-Marquardt algorithm.\n
 	'Model' is a callable that takes as an argument the model parameters and returns a function representing the model.\n
-	'Estimator' can either be an N-tuple containing a starting guess of the fit parameters, or a callable that returns a respective N-tuple for given x and y."""
+	'Estimator' can either be an N-tuple containing a starting guess of the fit parameters, or a callable that returns a respective N-tuple for given x and y.
 	if callable(estimator):
 		#return scipy.optimize.leastsq(lambda pp: model(*pp)(x) - y, estimator(x,y), warning=False)[0]
 		p = scipy.optimize.leastsq(lambda pp: model(*pp)(x) - y, estimator(x,y))[0]
 		return p
 	else:
 		#return scipy.optimize.leastsq(lambda pp: model(*pp)(x) - y, estimator, warning=False)[0]
-		return scipy.optimize.leastsq(lambda pp: model(*pp)(x) - y, estimator)[0]
+		return scipy.optimize.leastsq(lambda pp: model(*pp)(x) - y, estimator)[0] """
+
+# Updated fit function to allow a larger iteration 'budget'. Rolando A. Fimbres G. 4/9/2026
+def fit(x, y, model, estimator, maxfev=10000):
+    """Perform least-squares fit of (x, y) to model."""
+    p0 = estimator(x, y) if callable(estimator) else estimator
+
+    p, cov_x, infodict, mesg, ier = scipy.optimize.leastsq(
+        lambda pp: model(*pp)(x) - y,
+        p0,
+        full_output=True,
+        maxfev=maxfev,
+    )
+
+    # ier = 1,2,3,4 means success / acceptable termination
+    if ier not in (1, 2, 3, 4):
+        raise RuntimeError(f"leastsq failed: {mesg}")
+
+    return p
 
 def nonlinear_model(x, y, s, model, estimator, message=False):
 	"""Performs a non-linear least-squares fit of two dimensional data and a primitive error analysis. 

@@ -1391,7 +1391,7 @@ class SpinMeasurements:
                 for f in freq_indices:
                     freq = frequencies[f]
                     gw.sg.set_frequency(freq)
-                    time.sleep(0.005)
+                    time.sleep(0.01)
 
                     if kwargs['odmr_type'] == 'CW':
                         expected_bins = 2 * kwargs['runs']
