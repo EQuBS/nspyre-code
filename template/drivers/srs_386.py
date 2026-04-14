@@ -288,3 +288,127 @@ class SG386:
             raise ValueError("Sweep Deviation must be between 0.1 and 1e9 Hz.")
         self.device.write(f"SDEV {value}")
         logger.info(f"Set Sweep Deviation to {value}")
+
+    # Update: 4/13/2026 Rolando A. Fimbres G.- Added to make use of load list capability of the SG386. 
+    # After testing we will check if this allows for faster frequency switching during scans.
+    LIST_STATE_LEN = 15
+
+    def write_scpi(self, cmd):
+        """Write a raw SCPI command."""
+        self.device.write(cmd)
+
+    def query_scpi(self, cmd):
+        """Query a raw SCPI command and return stripped text."""
+        return str(self.device.query(cmd)).strip()
+
+    def opc(self):
+        """
+        Return True when all prior commands have completed.
+        Uses *OPC? as documented by the SG380 manual.
+        """
+        return int(float(self.query_scpi('*OPC?'))) == 1
+
+    def clear_status(self):
+        self.write_scpi('*CLS')
+
+    def last_error(self):
+        """Return the next entry from the SG error queue."""
+        return self.query_scpi('LERR?')
+
+    def drain_errors(self, max_reads=20):
+        """
+        Read out the SG error queue until it reports no error.
+        Returns a list of non-zero errors.
+        """
+        errs = []
+        for _ in range(max_reads):
+            err = self.last_error()
+            # SRS returns 0 / no-error when empty; keep the check permissive.
+            if err.startswith('0'):
+                break
+            errs.append(err)
+        return errs
+
+    def option_installed(self, option_number):
+        """Query installed option number, e.g. 3 for IQ."""
+        return int(float(self.query_scpi(f'OPTN? {int(option_number)}'))) == 1
+
+    def get_frequency_float(self):
+        return float(self.query_scpi('FREQ?'))
+
+    def list_delete(self):
+        self.write_scpi('LSTD')
+
+    def list_create(self, size):
+        size = int(size)
+        if size < 1:
+            raise ValueError('List size must be >= 1.')
+        ok = int(float(self.query_scpi(f'LSTC? {size}')))
+        if ok != 1:
+            raise RuntimeError(f'Could not create SG386 list of size {size}.')
+
+    def list_enable(self, enable=True):
+        self.write_scpi(f'LSTE {1 if enable else 0}')
+
+    def list_reset(self):
+        self.write_scpi('LSTR')
+
+    def list_index(self, index=None):
+        """
+        Query or set the current list index.
+        """
+        if index is None:
+            return int(float(self.query_scpi('LSTI?')))
+        index = int(index)
+        self.write_scpi(f'LSTI {index}')
+        return index
+
+    def list_size(self):
+        return int(float(self.query_scpi('LSTS?')))
+
+    def list_set_point(self, index, state_fields):
+        """
+        state_fields must be a length-15 iterable matching the SG380 list-state format.
+        Use 'N' for unchanged fields.
+        """
+        if len(state_fields) != self.LIST_STATE_LEN:
+            raise ValueError(
+                f'Each list state must have {self.LIST_STATE_LEN} fields.'
+            )
+        payload = ','.join(str(x) for x in state_fields)
+        self.write_scpi(f'LSTP {int(index)},{payload}')
+
+    def list_set_frequency_point(self, index, freq_hz):
+        """
+        Convenience helper: only change frequency, leave all other fields unchanged.
+        """
+        self.list_set_point(
+            index,
+            [f'{float(freq_hz):.12g}'] + ['N'] * 14
+        )
+
+    def list_load_frequencies(self, freqs_hz, enable=True):
+        """
+        Build a frequency-only list.
+        """
+        freqs_hz = list(freqs_hz)
+        if not freqs_hz:
+            raise ValueError('freqs_hz must not be empty.')
+
+        # Delete any old list, create a new one, fill it, and arm it.
+        self.list_delete()
+        self.list_create(len(freqs_hz))
+        for i, f_hz in enumerate(freqs_hz):
+            self.list_set_frequency_point(i, f_hz)
+
+        self.list_reset()
+        self.list_enable(enable)
+
+    def list_trigger(self, wait_until_done=False):
+        """
+        Advance to the next list point.
+        """
+        self.write_scpi('*TRG')
+        if wait_until_done:
+            return self.opc()
+        return True
