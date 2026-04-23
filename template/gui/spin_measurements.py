@@ -1303,6 +1303,10 @@ class SpinMeasurements:
 
             # Pulse Streamer sequences
             if kwargs['odmr_type'] == 'CW' or kwargs['odmr_type'] == 'CW_list':
+                if kwargs['odmr_type'] == 'CW_list':
+                    gw.sg.list_load_frequencies(frequencies)
+                else:
+                    pass
                 # IMPORTANT: build ONE run here; we will repeat it with stream(..., kwargs['runs'])
                 cw_buffer_ns = int(kwargs['CW_Buffer_Time'] * 1e9)
                 if 2 * cw_buffer_ns >= dwell_time // 2:
@@ -1310,6 +1314,10 @@ class SpinMeasurements:
                 cw_odmr_seq = gw.ps.New_CW_ODMR_R(dwell_time, kwargs['CW_Buffer_Time'], 1)
 
             elif kwargs['odmr_type'] == 'Pulsed' or kwargs['odmr_type'] == 'P_list':
+                if kwargs['odmr_type'] == 'P_list':
+                    gw.sg.list_load_frequencies(frequencies)
+                else:
+                    pass
                 pul_odmr_seq = gw.ps.Pulsed_ODMR_R_2(
                     kwargs['init_time'] * 1e9,
                     kwargs['wait_time'] * 1e9,
@@ -1321,6 +1329,10 @@ class SpinMeasurements:
                 )
 
             elif kwargs['odmr_type'] == 'Pulsed2' or kwargs['odmr_type'] == 'P2_list':
+                if kwargs['odmr_type'] == 'P2_list':
+                    gw.sg.list_load_frequencies(frequencies)
+                else:
+                    pass
                 if 2 * kwargs['read_time'] > kwargs['init_time']:
                     raise ValueError("Pulsed2 requires 2*read_time <= init_time.")
                 pul_odmr_seq2 = gw.ps.Pulsed_ODMR_R_3(
@@ -1331,8 +1343,8 @@ class SpinMeasurements:
                     kwargs['read_wait'] * 1e9,
                     kwargs['read_time'] * 1e9,
                 )
-            elif kwargs['odmr_type'] == 'CW_list':
-                gw.sg.list_load_frequencies(frequencies)
+            #elif kwargs['odmr_type'] == 'CW_list':
+               # gw.sg.list_load_frequencies(frequencies)
             else:
                 raise ValueError("Invalid ODMR type")
 
@@ -1471,6 +1483,7 @@ class SpinMeasurements:
                             return
                 
                 if kwargs['odmr_type'] not in ('CW', 'Pulsed', 'Pulsed2'):
+                    #gw.sg.list_load_frequencies(frequencies)
                     for f in frequencies:
                         gw.sg.list_trigger()
 

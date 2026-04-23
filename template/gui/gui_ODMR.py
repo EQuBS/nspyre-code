@@ -26,6 +26,11 @@ sys.path.append('../experiments')
 class ODMR_Widget(ExperimentWidget):
     def __init__(self, pulse_streamer_driver):
         self.ps = pulse_streamer_driver
+
+        self.odmr_type_combo = QtWidgets.QComboBox()
+        self.odmr_type_combo.addItems(['CW', 'CW_list', 'Pulsed', 'Pulsed2', 'P_list', 'P2_list'])
+        self.odmr_type_combo.setCurrentText('CW')
+
         params_config = {
             'start_freq': {
                 'display_text': 'Start Frequency',
@@ -114,7 +119,7 @@ class ODMR_Widget(ExperimentWidget):
             },
             'odmr_type': {
                 'display_text': 'ODMR Type',
-                'widget': QtWidgets.QLineEdit("CW"),
+                'widget': self.odmr_type_combo,
             },
             'laser_power': {
                 'display_text': 'Laser Power [%]',
