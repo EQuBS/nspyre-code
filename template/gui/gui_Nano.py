@@ -243,12 +243,14 @@ class NanoWidget(QtWidgets.QWidget):
         home_button = QtWidgets.QPushButton('Home')
         def home_axes(button):
             # Move all axes to 100 um (hardware)
-            self.nano.monitor_n(self.axis_centers[1], 1, self.nano.handle)
+            """ self.nano.monitor_n(self.axis_centers[1], 1, self.nano.handle)
             self._update_axis_widgets(1, actual_x)
             self.nano.monitor_n(self.axis_centers[2], 2, self.nano.handle)
             self._update_axis_widgets(2, actual_y)
             self.nano.monitor_n(self.axis_centers[3], 3, self.nano.handle)
-            self._update_axis_widgets(3, actual_z)
+            self._update_axis_widgets(3, actual_z) """
+            for axis in (1, 2, 3):
+                self.nano.monitor_n(self.axis_centers[axis], axis, self.nano.handle)
         home_button.clicked.connect(home_axes)
         layout.addWidget(home_button, layout_row, 0, 1, 2)  # Spans two columns for visibility
         layout_row += 1

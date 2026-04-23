@@ -30,7 +30,7 @@ class ODMR_Widget(ExperimentWidget):
             'start_freq': {
                 'display_text': 'Start Frequency',
                 'widget': SpinBox(
-                    value = 2.4e9,
+                    value = 2.67e9,
                     suffix = 'Hz',
                     siPrefix = True,
                     bounds = (100e3, 7e9),
@@ -40,7 +40,7 @@ class ODMR_Widget(ExperimentWidget):
             'stop_freq': {
                 'display_text': 'Stop Frequency',
                 'widget': SpinBox(
-                    value = 3.2e9,
+                    value = 3.07e9,
                     suffix = 'Hz',
                     siPrefix = True,
                     bounds = (100e3, 7e9),

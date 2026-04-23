@@ -1302,14 +1302,14 @@ class SpinMeasurements:
             gw.laser.on()
 
             # Pulse Streamer sequences
-            if kwargs['odmr_type'] == 'CW':
+            if kwargs['odmr_type'] == 'CW' or kwargs['odmr_type'] == 'CW_list':
                 # IMPORTANT: build ONE run here; we will repeat it with stream(..., kwargs['runs'])
                 cw_buffer_ns = int(kwargs['CW_Buffer_Time'] * 1e9)
                 if 2 * cw_buffer_ns >= dwell_time // 2:
                     raise ValueError("CW_Buffer_Time is too large for the chosen dwell_time.")
                 cw_odmr_seq = gw.ps.New_CW_ODMR_R(dwell_time, kwargs['CW_Buffer_Time'], 1)
 
-            elif kwargs['odmr_type'] == 'Pulsed':
+            elif kwargs['odmr_type'] == 'Pulsed' or kwargs['odmr_type'] == 'P_list':
                 pul_odmr_seq = gw.ps.Pulsed_ODMR_R_2(
                     kwargs['init_time'] * 1e9,
                     kwargs['wait_time'] * 1e9,
@@ -1320,7 +1320,7 @@ class SpinMeasurements:
                     kwargs['seq_gap'] * 1e9,
                 )
 
-            elif kwargs['odmr_type'] == 'Pulsed2':
+            elif kwargs['odmr_type'] == 'Pulsed2' or kwargs['odmr_type'] == 'P2_list':
                 if 2 * kwargs['read_time'] > kwargs['init_time']:
                     raise ValueError("Pulsed2 requires 2*read_time <= init_time.")
                 pul_odmr_seq2 = gw.ps.Pulsed_ODMR_R_3(
@@ -1331,6 +1331,8 @@ class SpinMeasurements:
                     kwargs['read_wait'] * 1e9,
                     kwargs['read_time'] * 1e9,
                 )
+            elif kwargs['odmr_type'] == 'CW_list':
+                gw.sg.list_load_frequencies(frequencies)
             else:
                 raise ValueError("Invalid ODMR type")
 
@@ -1388,84 +1390,120 @@ class SpinMeasurements:
 
                 time.sleep(0.01)
 
-                for f in freq_indices:
-                    freq = frequencies[f]
-                    gw.sg.set_frequency(freq)
-                    time.sleep(0.01)
+                if kwargs['odmr_type'] in ('CW', 'Pulsed', 'Pulsed2'):
+                    for f in freq_indices:
+                        freq = frequencies[f]
+                        gw.sg.set_frequency(freq)
+                        time.sleep(0.01)
 
-                    if kwargs['odmr_type'] == 'CW':
-                        expected_bins = 2 * kwargs['runs']
+                        if kwargs['odmr_type'] == 'CW':
+                            expected_bins = 2 * kwargs['runs']
 
-                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
-                        gw.daq.cbm_clear()
-                        gw.daq.CBM_start()
-                        gw.daq.sync()
+                            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                            gw.daq.cbm_clear()
+                            gw.daq.CBM_start()
+                            gw.daq.sync()
 
-                        # Sequence was built for ONE run, so repeat it here
-                        gw.ps.stream(obtain(cw_odmr_seq), kwargs['runs'])
+                            # Sequence was built for ONE run, so repeat it here
+                            gw.ps.stream(obtain(cw_odmr_seq), kwargs['runs'])
 
-                        while not gw.daq.cbm_ready():
-                            time.sleep(0.001)
+                            while not gw.daq.cbm_ready():
+                                time.sleep(0.001)
 
-                        counts, binwidths = _read_cbm(expected_bins, 'CW ODMR')
+                            counts, binwidths = _read_cbm(expected_bins, 'CW ODMR')
 
-                        sig[f] = _rate_cps(counts[0::2], binwidths[0::2])
-                        bg[f] = _rate_cps(counts[1::2], binwidths[1::2])
+                            sig[f] = _rate_cps(counts[0::2], binwidths[0::2])
+                            bg[f] = _rate_cps(counts[1::2], binwidths[1::2])
 
-                    elif kwargs['odmr_type'] == 'Pulsed':
-                        expected_bins = 2 * kwargs['runs']
+                        elif kwargs['odmr_type'] == 'Pulsed':
+                            expected_bins = 2 * kwargs['runs']
 
-                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
-                        gw.daq.cbm_clear()
-                        gw.daq.CBM_start()
-                        gw.daq.sync()
-                        gw.ps.stream(obtain(pul_odmr_seq), kwargs['runs'])
+                            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                            gw.daq.cbm_clear()
+                            gw.daq.CBM_start()
+                            gw.daq.sync()
+                            gw.ps.stream(obtain(pul_odmr_seq), kwargs['runs'])
 
-                        while not gw.daq.cbm_ready():
-                            time.sleep(0.001)
+                            while not gw.daq.cbm_ready():
+                                time.sleep(0.001)
 
-                        counts, binwidths = _read_cbm(expected_bins, 'Pulsed ODMR')
+                            counts, binwidths = _read_cbm(expected_bins, 'Pulsed ODMR')
 
-                        sig[f] = _rate_cps(counts[0::2], binwidths[0::2])
-                        bg[f] = _rate_cps(counts[1::2], binwidths[1::2])
+                            sig[f] = _rate_cps(counts[0::2], binwidths[0::2])
+                            bg[f] = _rate_cps(counts[1::2], binwidths[1::2])
 
-                    elif kwargs['odmr_type'] == 'Pulsed2':
-                        expected_bins = 4 * kwargs['runs']
+                        elif kwargs['odmr_type'] == 'Pulsed2':
+                            expected_bins = 4 * kwargs['runs']
 
-                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
-                        gw.daq.cbm_clear()
-                        gw.daq.CBM_start()
-                        gw.daq.sync()
-                        gw.ps.stream(obtain(pul_odmr_seq2), kwargs['runs'])
+                            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                            gw.daq.cbm_clear()
+                            gw.daq.CBM_start()
+                            gw.daq.sync()
+                            gw.ps.stream(obtain(pul_odmr_seq2), kwargs['runs'])
 
-                        while not gw.daq.cbm_ready():
-                            time.sleep(0.001)
+                            while not gw.daq.cbm_ready():
+                                time.sleep(0.001)
 
-                        counts, binwidths = _read_cbm(expected_bins, 'Pulsed2 ODMR')
+                            counts, binwidths = _read_cbm(expected_bins, 'Pulsed2 ODMR')
 
-                        s1_arr[f] = _rate_cps(counts[0::4], binwidths[0::4])
-                        s2_arr[f] = _rate_cps(counts[1::4], binwidths[1::4])
-                        s3_arr[f] = _rate_cps(counts[2::4], binwidths[2::4])
-                        s4_arr[f] = _rate_cps(counts[3::4], binwidths[3::4])
+                            s1_arr[f] = _rate_cps(counts[0::4], binwidths[0::4])
+                            s2_arr[f] = _rate_cps(counts[1::4], binwidths[1::4])
+                            s3_arr[f] = _rate_cps(counts[2::4], binwidths[2::4])
+                            s4_arr[f] = _rate_cps(counts[3::4], binwidths[3::4])
 
-                        # Keep current semantics:
-                        sig[f] = s3_arr[f]
-                        bg[f] = s1_arr[f]
+                            # Keep current semantics:
+                            sig[f] = s3_arr[f]
+                            bg[f] = s1_arr[f]
 
-                        # If your intended 4-window protocol is symmetric, use this instead:
-                        # sig[f] = 0.5 * (s3_arr[f] + s4_arr[f])
-                        # bg[f] = 0.5 * (s1_arr[f] + s2_arr[f])
+                            # If your intended 4-window protocol is symmetric, use this instead:
+                            # sig[f] = 0.5 * (s3_arr[f] + s4_arr[f])
+                            # bg[f] = 0.5 * (s1_arr[f] + s2_arr[f])
 
-                    if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                        gw.sg.set_rf_toggle(0)
-                        gw.sg.set_mod_toggle(0)
-                        gw.ps.ps_reset()
-                        gw.laser.get_power()
-                        gw.laser.set_power(0)
-                        gw.ps.just_gate_off()
-                        gw.laser.off()
-                        print('the GUI has asked us nicely to exit')
-                        return
+                        if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                            gw.sg.set_rf_toggle(0)
+                            gw.sg.set_mod_toggle(0)
+                            gw.ps.ps_reset()
+                            gw.laser.get_power()
+                            gw.laser.set_power(0)
+                            gw.ps.just_gate_off()
+                            gw.laser.off()
+                            print('the GUI has asked us nicely to exit')
+                            return
+                
+                if kwargs['odmr_type'] not in ('CW', 'Pulsed', 'Pulsed2'):
+                    for f in frequencies:
+                        gw.sg.list_trigger()
+
+                        if kwargs['odmr_type'] == 'CW_list':
+                            expected_bins = 2 * kwargs['runs']
+
+                            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                            gw.daq.cbm_clear()
+                            gw.daq.CBM_start()
+                            gw.daq.sync()
+
+                            # Sequence was built for ONE run, so repeat it here
+                            gw.ps.stream(obtain(cw_odmr_seq), kwargs['runs'])
+
+                            while not gw.daq.cbm_ready():
+                                time.sleep(0.001)
+
+                            counts, binwidths = _read_cbm(expected_bins, 'CW ODMR')
+
+                            sig[f] = _rate_cps(counts[0::2], binwidths[0::2])
+                            bg[f] = _rate_cps(counts[1::2], binwidths[1::2])
+
+
+                        if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                            gw.sg.set_rf_toggle(0)
+                            gw.sg.set_mod_toggle(0)
+                            gw.ps.ps_reset()
+                            gw.laser.get_power()
+                            gw.laser.set_power(0)
+                            gw.ps.just_gate_off()
+                            gw.laser.off()
+                            print('the GUI has asked us nicely to exit')
+                            return
 
                 with np.errstate(divide='ignore', invalid='ignore'):
                     norm = np.where(bg != 0, sig / bg, np.nan)
