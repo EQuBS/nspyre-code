@@ -109,6 +109,11 @@ class NanoWidget(QtWidgets.QWidget):
         home_button = QPushButton("Home")
         nanostage_vbox.addWidget(home_button, 10, 2)
 
+        # Setting format for the spinboxes:
+        self.x_position_spinbox.setDecimals(3)
+        self.y_position_spinbox.setDecimals(3)
+        self.z_position_spinbox.setDecimals(3)
+
         # Crucial: This pushes all rows to the top
         nanostage_vbox.setRowStretch(11, 1) 
         
@@ -134,12 +139,20 @@ class NanoWidget(QtWidgets.QWidget):
         set_button.clicked.connect(lambda _=False: self._safe_call(self._set_edited_axes))
 
         # Step buttons
-        x_plus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 1, self.step_val.value()))
+        """ x_plus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 1, self.step_val.value()))
         x_minus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 1, -self.step_val.value()))
         y_plus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 2, self.step_val.value()))
         y_minus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 2, -self.step_val.value()))
         z_plus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 3, self.step_val.value()))
-        z_minus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 3, -self.step_val.value()))
+        z_minus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 3, -self.step_val.value())) """
+
+        # Alternative step connections (more direct approach) 4/23/2026
+        x_plus.clicked.connect(lambda _=False: self.dir_step_axis(1, self.step_val.value()))
+        x_minus.clicked.connect(lambda _=False: self.dir_step_axis(1, -self.step_val.value()))
+        y_plus.clicked.connect(lambda _=False: self.dir_step_axis(2, self.step_val.value()))
+        y_minus.clicked.connect(lambda _=False: self.dir_step_axis(2, -self.step_val.value()))
+        z_plus.clicked.connect(lambda _=False: self.dir_step_axis(3, self.step_val.value()))
+        z_minus.clicked.connect(lambda _=False: self.dir_step_axis(3, -self.step_val.value()))
         
         # Read button
         read_btn.clicked.connect(lambda _=False: self._safe_call(self._refresh_positions))
@@ -209,6 +222,17 @@ class NanoWidget(QtWidgets.QWidget):
             self._move_axis_absolute_user(axis, value)
         self.edited_axes.clear()
         self._refresh_positions()  # Ensure widgets reflect actual position after move
+
+    ##############
+    # More direct, step motion functions (added 4/23/2026)
+
+    def dir_step_axis(self, axis, delta_um):
+        current_pos = self.nano.single_read_n(axis, self.nano.handle)
+        target_pos = current_pos + float(delta_um)
+        motion_step = self.nano.monitor_n(target_pos, axis, self.nano.handle)
+        self._set_axis_widgets(axis, motion_step)
+
+
 
     def closeEvent(self, event):
         try:
