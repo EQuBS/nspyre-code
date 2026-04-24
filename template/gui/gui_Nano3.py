@@ -58,11 +58,14 @@ class NanoWidget(QtWidgets.QWidget):
         # --- Section 2: Step Size (Condensed) ---
         step_label = QLabel("<b>Step Size</b>")
         nanostage_vbox.addWidget(step_label, 3, 0)
-        self.step_val = QDoubleSpinBox()
+        self.step_val = SpinBox(
+            value=0.025, step=0.003, bounds=(0.003, 9.000), decimals=3, integer=False,
+        )
+        """ self.step_val = QDoubleSpinBox()
         self.step_val.setValue(0.025)
         self.step_val.setRange(0.003, 9.000)
         self.step_val.setSingleStep(0.003)
-        self.step_val.setDecimals(3)
+        self.step_val.setDecimals(3) """
         nanostage_vbox.addWidget(self.step_val, 3, 1, 1, 2) # Spans 2 columns
 
         # X, Y, Z Buttons on single rows
@@ -85,25 +88,37 @@ class NanoWidget(QtWidgets.QWidget):
         nanostage_vbox.addWidget(set_label, 7, 0, 1, 3)
         
         nanostage_vbox.addWidget(QLabel("X"), 8, 0)
-        self.x_position_spinbox = QDoubleSpinBox()
+        self.x_position_spinbox = SpinBox(
+            value=0, step=0.003, bounds=(-self.axis_centers[1], self.axis_centers[1]),
+            decimals=3, integer=False,
+        )
+        """ self.x_position_spinbox = QDoubleSpinBox()
         self.x_position_spinbox.setValue(0)
         self.x_position_spinbox.setRange(-self.axis_centers[1], self.axis_centers[1])
         self.x_position_spinbox.setSingleStep(0.003)
-        self.x_position_spinbox.setDecimals(3)
+        self.x_position_spinbox.setDecimals(3) """
         nanostage_vbox.addWidget(self.x_position_spinbox, 8, 1)
         nanostage_vbox.addWidget(QLabel("Y"), 9, 0)
-        self.y_position_spinbox = QDoubleSpinBox()
+        self.y_position_spinbox = SpinBox(
+            value=0, step=0.003, bounds=(-self.axis_centers[2], self.axis_centers[2]),
+            decimals=3, integer=False,
+        )
+        """ self.y_position_spinbox = QDoubleSpinBox()
         self.y_position_spinbox.setValue(0)
         self.y_position_spinbox.setRange(-self.axis_centers[2], self.axis_centers[2])
         self.y_position_spinbox.setSingleStep(0.003)
-        self.y_position_spinbox.setDecimals(3)
+        self.y_position_spinbox.setDecimals(3) """
         nanostage_vbox.addWidget(self.y_position_spinbox, 9, 1)
         nanostage_vbox.addWidget(QLabel("Z"), 10, 0)
-        self.z_position_spinbox = QDoubleSpinBox()
+        self.z_position_spinbox = SpinBox(
+            value=0, step=0.003, bounds=(-self.axis_centers[3], self.axis_centers[3]),
+            decimals=3, integer=False,
+        )
+        """ self.z_position_spinbox = QDoubleSpinBox()
         self.z_position_spinbox.setValue(0)
         self.z_position_spinbox.setRange(-self.axis_centers[3], self.axis_centers[3])
         self.z_position_spinbox.setSingleStep(0.003)
-        self.z_position_spinbox.setDecimals(3)
+        self.z_position_spinbox.setDecimals(3) """
         nanostage_vbox.addWidget(self.z_position_spinbox, 10, 1)
         set_button = QPushButton("Set")
         nanostage_vbox.addWidget(set_button, 8, 2, 3, 1) # Spans 3 rows
