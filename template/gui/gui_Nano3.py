@@ -87,21 +87,21 @@ class NanoWidget(QtWidgets.QWidget):
         nanostage_vbox.addWidget(QLabel("X"), 8, 0)
         self.x_position_spinbox = QDoubleSpinBox()
         self.x_position_spinbox.setValue(0)
-        self.x_position_spinbox.setRange(0.003, 9.000)
+        self.x_position_spinbox.setRange(-self.axis_centers[1], self.axis_centers[1])
         self.x_position_spinbox.setSingleStep(0.003)
         self.x_position_spinbox.setDecimals(3)
         nanostage_vbox.addWidget(self.x_position_spinbox, 8, 1)
         nanostage_vbox.addWidget(QLabel("Y"), 9, 0)
         self.y_position_spinbox = QDoubleSpinBox()
         self.y_position_spinbox.setValue(0)
-        self.y_position_spinbox.setRange(0.003, 9.000)
+        self.y_position_spinbox.setRange(-self.axis_centers[2], self.axis_centers[2])
         self.y_position_spinbox.setSingleStep(0.003)
         self.y_position_spinbox.setDecimals(3)
         nanostage_vbox.addWidget(self.y_position_spinbox, 9, 1)
         nanostage_vbox.addWidget(QLabel("Z"), 10, 0)
         self.z_position_spinbox = QDoubleSpinBox()
         self.z_position_spinbox.setValue(0)
-        self.z_position_spinbox.setRange(0.003, 9.000)
+        self.z_position_spinbox.setRange(-self.axis_centers[3], self.axis_centers[3])
         self.z_position_spinbox.setSingleStep(0.003)
         self.z_position_spinbox.setDecimals(3)
         nanostage_vbox.addWidget(self.z_position_spinbox, 10, 1)
@@ -135,20 +135,20 @@ class NanoWidget(QtWidgets.QWidget):
         set_button.clicked.connect(lambda _=False: self._safe_call(self._set_edited_axes))
 
         # Step buttons
-        """ x_plus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 1, self.step_val.value()))
+        x_plus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 1, self.step_val.value()))
         x_minus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 1, -self.step_val.value()))
         y_plus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 2, self.step_val.value()))
         y_minus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 2, -self.step_val.value()))
         z_plus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 3, self.step_val.value()))
-        z_minus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 3, -self.step_val.value())) """
+        z_minus.clicked.connect(lambda _=False: self._safe_call(self._step_axis, 3, -self.step_val.value()))
 
-        # Alternative step connections (more direct approach) 4/23/2026
+        """ # Alternative step connections (more direct approach) 4/23/2026
         x_plus.clicked.connect(lambda _=False: self.dir_step_axis(1, self.step_val.value()))
         x_minus.clicked.connect(lambda _=False: self.dir_step_axis(1, -self.step_val.value()))
         y_plus.clicked.connect(lambda _=False: self.dir_step_axis(2, self.step_val.value()))
         y_minus.clicked.connect(lambda _=False: self.dir_step_axis(2, -self.step_val.value()))
         z_plus.clicked.connect(lambda _=False: self.dir_step_axis(3, self.step_val.value()))
-        z_minus.clicked.connect(lambda _=False: self.dir_step_axis(3, -self.step_val.value()))
+        z_minus.clicked.connect(lambda _=False: self.dir_step_axis(3, -self.step_val.value())) """
         
         # Read button
         read_btn.clicked.connect(lambda _=False: self._safe_call(self._refresh_positions))
