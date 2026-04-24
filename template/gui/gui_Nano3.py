@@ -10,7 +10,7 @@ from pyqtgraph import SpinBox
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout,
                              QPushButton, QLabel, QHBoxLayout,
                              QGridLayout, QPushButton, QGroupBox,
-                             QLineEdit)
+                             QLineEdit, QDoubleSpinBox)
 from MCL_Madlib_Wrapper import MCL_Nanodrive 
 
 
@@ -58,7 +58,7 @@ class NanoWidget(QtWidgets.QWidget):
         # --- Section 2: Step Size (Condensed) ---
         step_label = QLabel("<b>Step Size</b>")
         nanostage_vbox.addWidget(step_label, 3, 0)
-        self.step_val = SpinBox(value=0.025, siPrefix=False, bounds=(0.003, 9.000), step=0.003, dec=3)
+        self.step_val = QDoubleSpinBox(value=0.025, siPrefix=False, bounds=(0.003, 9.000), step=0.003, dec=3)
         nanostage_vbox.addWidget(self.step_val, 3, 1, 1, 2) # Spans 2 columns
 
         # X, Y, Z Buttons on single rows
@@ -81,7 +81,7 @@ class NanoWidget(QtWidgets.QWidget):
         nanostage_vbox.addWidget(set_label, 7, 0, 1, 3)
         
         nanostage_vbox.addWidget(QLabel("X"), 8, 0)
-        self.x_position_spinbox = SpinBox(value=0,
+        self.x_position_spinbox = QDoubleSpinBox(value=0,
             siPrefix=False,
             bounds=(-self.axis_centers[1], self.axis_centers[1]),
             step=0.003,
@@ -89,7 +89,7 @@ class NanoWidget(QtWidgets.QWidget):
             int=False,)
         nanostage_vbox.addWidget(self.x_position_spinbox, 8, 1)
         nanostage_vbox.addWidget(QLabel("Y"), 9, 0)
-        self.y_position_spinbox = SpinBox(value=0,
+        self.y_position_spinbox = QDoubleSpinBox(value=0,
             siPrefix=False,
             bounds=(-self.axis_centers[2], self.axis_centers[2]),
             step=0.003,
@@ -97,7 +97,7 @@ class NanoWidget(QtWidgets.QWidget):
             int=False,)
         nanostage_vbox.addWidget(self.y_position_spinbox, 9, 1)
         nanostage_vbox.addWidget(QLabel("Z"), 10, 0)
-        self.z_position_spinbox = SpinBox(value=0,
+        self.z_position_spinbox = QDoubleSpinBox(value=0,
             siPrefix=False,
             bounds=(-self.axis_centers[3], self.axis_centers[3]),
             step=0.003,
@@ -228,8 +228,10 @@ class NanoWidget(QtWidgets.QWidget):
 
     def dir_step_axis(self, axis, delta_um):
         current_pos = self.nano.single_read_n(axis, self.nano.handle)
+        #pos_4_user = float(current_pos) - self.axis_centers[axis]
         target_pos = current_pos + float(delta_um)
-        motion_step = self.nano.monitor_n(target_pos, axis, self.nano.handle)
+        motion = max(self.axis_min[axis], min(float(target_pos), self.axis_max[axis]))
+        motion_step = self.nano.monitor_n(motion, axis, self.nano.handle)
         self._set_axis_widgets(axis, motion_step)
 
 
