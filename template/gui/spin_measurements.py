@@ -1484,8 +1484,9 @@ class SpinMeasurements:
                 
                 if kwargs['odmr_type'] not in ('CW', 'Pulsed', 'Pulsed2'):
                     #gw.sg.list_load_frequencies(frequencies)
-                    for f in frequencies:
-                        gw.sg.list_trigger()
+                    for idx in frequencies:
+                        gw.sg.list_index(idx)
+                        gw.sg.list_trigger(wait_until_done=True)
 
                         if kwargs['odmr_type'] == 'CW_list':
                             expected_bins = 2 * kwargs['runs']
@@ -1503,9 +1504,48 @@ class SpinMeasurements:
 
                             counts, binwidths = _read_cbm(expected_bins, 'CW ODMR')
 
-                            sig[f] = _rate_cps(counts[0::2], binwidths[0::2])
-                            bg[f] = _rate_cps(counts[1::2], binwidths[1::2])
+                            sig[idx] = _rate_cps(counts[0::2], binwidths[0::2])
+                            bg[idx] = _rate_cps(counts[1::2], binwidths[1::2])
 
+                        elif kwargs['odmr_type'] == 'Pulsed':
+                            expected_bins = 2 * kwargs['runs']
+
+                            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                            gw.daq.cbm_clear()
+                            gw.daq.CBM_start()
+                            gw.daq.sync()
+                            gw.ps.stream(obtain(pul_odmr_seq), kwargs['runs'])
+
+                            while not gw.daq.cbm_ready():
+                                time.sleep(0.001)
+
+                            counts, binwidths = _read_cbm(expected_bins, 'Pulsed ODMR')
+
+                            sig[idx] = _rate_cps(counts[0::2], binwidths[0::2])
+                            bg[idx] = _rate_cps(counts[1::2], binwidths[1::2])
+
+                        elif kwargs['odmr_type'] == 'Pulsed2':
+                            expected_bins = 4 * kwargs['runs']
+
+                            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                            gw.daq.cbm_clear()
+                            gw.daq.CBM_start()
+                            gw.daq.sync()
+                            gw.ps.stream(obtain(pul_odmr_seq2), kwargs['runs'])
+
+                            while not gw.daq.cbm_ready():
+                                time.sleep(0.001)
+
+                            counts, binwidths = _read_cbm(expected_bins, 'Pulsed2 ODMR')
+
+                            s1_arr[idx] = _rate_cps(counts[0::4], binwidths[0::4])
+                            s2_arr[idx] = _rate_cps(counts[1::4], binwidths[1::4])
+                            s3_arr[idx] = _rate_cps(counts[2::4], binwidths[2::4])
+                            s4_arr[idx] = _rate_cps(counts[3::4], binwidths[3::4])
+
+                            # Keep current semantics:
+                            sig[idx] = s3_arr[idx]
+                            bg[idx] = s1_arr[idx]
 
                         if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
                             gw.sg.set_rf_toggle(0)
@@ -1547,7 +1587,7 @@ class SpinMeasurements:
                     },
                     'title': 'Optically Detected Magnetic Resonance',
                     'xlabel': 'Frequency (GHz)',
-                    'ylabel': 'Counts',
+                    'ylabel': 'Counts/s',
                     'datasets': {
                         'signal': signal_sweeps,
                         'background': background_sweeps,
@@ -2687,7 +2727,7 @@ class SpinMeasurements:
                         },
                             'title': 'Rabi',                       
                             'xlabel': 'MW Time (ns)',
-                            'ylabel': 'Counts',
+                            'ylabel': 'Counts/s',
                             'datasets': {
                                 'signal' : signal_sweeps,
                                 'background': background_sweeps

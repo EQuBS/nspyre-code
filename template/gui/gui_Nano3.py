@@ -11,26 +11,45 @@ from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout,
                              QPushButton, QLabel, QHBoxLayout,
                              QGridLayout, QPushButton, QGroupBox,
                              QLineEdit, QDoubleSpinBox)
-from MCL_Madlib_Wrapper import MCL_Nanodrive 
+from MCL_Madlib_Wrapper import MCL_Nanodrive
+#from gui_Nano3 import NanoWidget 
 
+""" if __name__ == "__main__":
+    nano = MCL_Nanodrive()
+    if not hasattr(nano, 'handle') or nano.handle in (None, 0, ''):
+        nano.init_handle()
+    app = QtWidgets.QApplication([])
+    widget = NanoWidget(nano)
+    widget.show()
+    app.exec() """
 
 class NanoWidget(QtWidgets.QWidget):
     """Qt widget for controlling the Nano-3D200FT from MadCity Labs."""
 
-    def __init__(self, nano): #, nano=None, handle=None
+    def __init__(self, nano=None): #, nano=None, handle=None
         """
         Args:
             nano_driver: The MCL Nanodrive driver.
         """
         super().__init__()
+        self._owns_nano = nano is None
+        if nano is None:
+            from MCL_Madlib_Wrapper import MCL_Nanodrive
+            nano = MCL_Nanodrive()
+            if not hasattr(nano, 'handle') or nano.handle in (None, 0, ''):
+                handle = nano.init_handle()
+                # Ensure handle is set on the object
+                if not hasattr(nano, 'handle') or nano.handle in (None, 0, ''):
+                    nano.handle = handle
         self.nano = nano
+        self.handle = self._resolve_handle()
 
         ### Added by Rolando 4/3/2026  ####################
         self.axis_min = {1: 0.0, 2: 0.0, 3: 0.0}
         self.axis_max = {
-            1: float(self.nano.get_calibration(1, self.nano.handle)),
-            2: float(self.nano.get_calibration(2, self.nano.handle)),
-            3: float(self.nano.get_calibration(3, self.nano.handle)),
+            1: float(self.nano.get_calibration(1, self.handle)),
+            2: float(self.nano.get_calibration(2, self.handle)),
+            3: float(self.nano.get_calibration(3, self.handle)),
         }
         self.axis_centers = {
             axis: 0.5 * (self.axis_min[axis] + self.axis_max[axis])
@@ -58,14 +77,14 @@ class NanoWidget(QtWidgets.QWidget):
         # --- Section 2: Step Size (Condensed) ---
         step_label = QLabel("<b>Step Size</b>")
         nanostage_vbox.addWidget(step_label, 3, 0)
-        self.step_val = SpinBox(
-            value=0.025, step=0.003, bounds=(0.003, 9.000), decimals=3, integer=False,
-        )
-        """ self.step_val = QDoubleSpinBox()
+        """ self.step_val = SpinBox(
+            value=0.025, step=0.003, bounds=(0.003, 9.000), decimals=3, int=False,
+        ) """
+        self.step_val = QDoubleSpinBox()
         self.step_val.setValue(0.025)
         self.step_val.setRange(0.003, 9.000)
         self.step_val.setSingleStep(0.003)
-        self.step_val.setDecimals(3) """
+        self.step_val.setDecimals(3)
         nanostage_vbox.addWidget(self.step_val, 3, 1, 1, 2) # Spans 2 columns
 
         # X, Y, Z Buttons on single rows
@@ -88,37 +107,37 @@ class NanoWidget(QtWidgets.QWidget):
         nanostage_vbox.addWidget(set_label, 7, 0, 1, 3)
         
         nanostage_vbox.addWidget(QLabel("X"), 8, 0)
-        self.x_position_spinbox = SpinBox(
+        """ self.x_position_spinbox = SpinBox(
             value=0, step=0.003, bounds=(-self.axis_centers[1], self.axis_centers[1]),
-            decimals=3, integer=False,
-        )
-        """ self.x_position_spinbox = QDoubleSpinBox()
+            decimals=3, int=False,
+        ) """
+        self.x_position_spinbox = QDoubleSpinBox()
         self.x_position_spinbox.setValue(0)
         self.x_position_spinbox.setRange(-self.axis_centers[1], self.axis_centers[1])
         self.x_position_spinbox.setSingleStep(0.003)
-        self.x_position_spinbox.setDecimals(3) """
+        self.x_position_spinbox.setDecimals(3)
         nanostage_vbox.addWidget(self.x_position_spinbox, 8, 1)
         nanostage_vbox.addWidget(QLabel("Y"), 9, 0)
-        self.y_position_spinbox = SpinBox(
+        """ self.y_position_spinbox = SpinBox(
             value=0, step=0.003, bounds=(-self.axis_centers[2], self.axis_centers[2]),
-            decimals=3, integer=False,
-        )
-        """ self.y_position_spinbox = QDoubleSpinBox()
+            decimals=3, int=False,
+        ) """
+        self.y_position_spinbox = QDoubleSpinBox()
         self.y_position_spinbox.setValue(0)
         self.y_position_spinbox.setRange(-self.axis_centers[2], self.axis_centers[2])
         self.y_position_spinbox.setSingleStep(0.003)
-        self.y_position_spinbox.setDecimals(3) """
+        self.y_position_spinbox.setDecimals(3)
         nanostage_vbox.addWidget(self.y_position_spinbox, 9, 1)
         nanostage_vbox.addWidget(QLabel("Z"), 10, 0)
-        self.z_position_spinbox = SpinBox(
+        """ self.z_position_spinbox = SpinBox(
             value=0, step=0.003, bounds=(-self.axis_centers[3], self.axis_centers[3]),
-            decimals=3, integer=False,
-        )
-        """ self.z_position_spinbox = QDoubleSpinBox()
+            decimals=3, int=False,
+        ) """
+        self.z_position_spinbox = QDoubleSpinBox()
         self.z_position_spinbox.setValue(0)
         self.z_position_spinbox.setRange(-self.axis_centers[3], self.axis_centers[3])
         self.z_position_spinbox.setSingleStep(0.003)
-        self.z_position_spinbox.setDecimals(3) """
+        self.z_position_spinbox.setDecimals(3)
         nanostage_vbox.addWidget(self.z_position_spinbox, 10, 1)
         set_button = QPushButton("Set")
         nanostage_vbox.addWidget(set_button, 8, 2, 3, 1) # Spans 3 rows
@@ -169,6 +188,35 @@ class NanoWidget(QtWidgets.QWidget):
         read_btn.clicked.connect(lambda _=False: self._safe_call(self._refresh_positions))
 
     #################################
+    # Added by Rolando 5/1/2026
+    def _resolve_handle(self):
+        """Resolve the MCL handle without creating a second owner when using gw.nano."""
+        for attr in ("handle", "_handle", "hdl"):
+            try:
+                value = getattr(self.nano, attr)
+                if value not in (None, 0, ""):
+                    return int(value)
+            except Exception:
+                pass
+
+        for method_name in ("get_handle", "init_handle_or_get_existing", "init_handle"):
+            try:
+                method = getattr(self.nano, method_name)
+            except Exception:
+                method = None
+
+            if callable(method):
+                value = method()
+                if value not in (None, 0, ""):
+                    return int(value)
+
+        raise RuntimeError(
+            "Could not resolve NanoDrive handle. "
+            "Make sure the instrument-server MCL_Madlib_Wrapper.py exposes get_handle(), "
+            "then restart the instrument server."
+        )
+
+    #################################
     # Motion functions
 
     def _hw_to_user(self, axis, hw_value):
@@ -194,25 +242,25 @@ class NanoWidget(QtWidgets.QWidget):
 
     def _refresh_positions(self):
         for axis in (1, 2, 3):
-            hw_value = self.nano.single_read_n(axis, self.nano.handle)
+            hw_value = self.nano.single_read_n(axis, self.handle)
             self._set_axis_widgets(axis, hw_value)
 
     def _move_axis_absolute_user(self, axis, user_target):
         hw_target = self._clamp_hw(axis, self._user_to_hw(axis, user_target))
         #hw_target = float(user_target)
-        actual_hw = self.nano.monitor_n(hw_target, axis, self.nano.handle)
+        actual_hw = self.nano.monitor_n(hw_target, axis, self.handle)
         self._set_axis_widgets(axis, actual_hw)
 
     def _step_axis(self, axis, delta_um):
-        current_hw = self.nano.single_read_n(axis, self.nano.handle)
+        current_hw = self.nano.single_read_n(axis, self.handle)
         target_hw = self._clamp_hw(axis, current_hw + float(delta_um))
         #target_hw = current_hw + float(delta_um)
-        actual_hw = self.nano.monitor_n(target_hw, axis, self.nano.handle)
+        actual_hw = self.nano.monitor_n(target_hw, axis, self.handle)
         self._set_axis_widgets(axis, actual_hw)
 
     def _home_axes(self):
         for axis in (1, 2, 3):
-            actual_hw = self.nano.monitor_n(self.axis_centers[axis], axis, self.nano.handle)
+            actual_hw = self.nano.monitor_n(self.axis_centers[axis], axis, self.handle)
             self._set_axis_widgets(axis, actual_hw)
 
     def _safe_call(self, fn, *args, **kwargs):
@@ -238,22 +286,23 @@ class NanoWidget(QtWidgets.QWidget):
     # More direct, step motion functions (added 4/23/2026)
 
     def dir_step_axis(self, axis, delta_um):
-        current_pos = self.nano.single_read_n(axis, self.nano.handle)
+        current_pos = self.nano.single_read_n(axis, self.handle)
         #pos_4_user = float(current_pos) - self.axis_centers[axis]
         target_pos = current_pos + float(delta_um)
         motion = max(self.axis_min[axis], min(float(target_pos), self.axis_max[axis]))
-        motion_step = self.nano.monitor_n(motion, axis, self.nano.handle)
+        motion_step = self.nano.monitor_n(motion, axis, self.handle)
         self._set_axis_widgets(axis, motion_step)
-
 
 
     def closeEvent(self, event):
         try:
-            if hasattr(self.nano, 'release_handle') and hasattr(self.nano, 'handle'):
-                self.nano.release_handle(self.nano.handle)
-                print('Nano-Drive handle released.')
+            # Only release a handle if this widget created its own local NanoDrive.
+            # Never release the shared instrument-server gw.nano handle from the GUI.
+            if self._owns_nano and hasattr(self.nano, "release_handle"):
+                self.nano.release_handle(self.handle)
+                print("Local Nano-Drive handle released.")
         except Exception as e:
-            print(f'Error releasing Nano-Drive handle: {e}')
+            print(f"Error releasing Nano-Drive handle: {e}")
         super().closeEvent(event)
 
 

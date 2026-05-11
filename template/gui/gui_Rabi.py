@@ -197,7 +197,8 @@ def process_Rabi_data(sink: DataSink):
         diff_sweeps.append(np.stack([mw_times, sig - bg]))
 
         with np.errstate(divide='ignore', invalid='ignore'):
-            contrast = (sig - bg) / (sig + bg)
+            #contrast = (sig - bg) / (sig + bg)
+            contrast = (bg - sig) / (bg + sig)
             contrast = np.where(np.isfinite(contrast), contrast, 0)  # or use 0 instead of np.nan if preferred
             norm_diff = (sig - bg) / bg
             norm_diff = np.where(np.isfinite(norm_diff), norm_diff, np.nan)
