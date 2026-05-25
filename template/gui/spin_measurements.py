@@ -674,12 +674,12 @@ class SpinMeasurements:
             num_read_wind = len(read_windows)
 
             # define buffer size here
-            """ init_buffer_size = kwargs['runs']*num_read_wind
+            init_buffer_size = kwargs['runs']*num_read_wind
             if init_buffer_size < 4:
                 raise ValueError("Buffer size too small.")
 
             ni_sample_buffer = np.ascontiguousarray(np.zeros(init_buffer_size), dtype=np.float64)
-            init_buffer = [ni_sample_buffer] """
+            init_buffer = [ni_sample_buffer]
 
             np.set_printoptions(precision = 6)
 
@@ -1287,11 +1287,17 @@ class SpinMeasurements:
 
             signal_sweeps = StreamingList()
             background_sweeps = StreamingList()
+            sig_avg_sweeps = StreamingList()
+            bg_avg_sweeps = StreamingList()
             norm_sweeps = StreamingList()
             s1_sweeps = StreamingList()
+            s1_avg_sweeps = StreamingList()
             s2_sweeps = StreamingList()
+            s2_avg_sweeps = StreamingList()
             s3_sweeps = StreamingList()
+            s3_avg_sweeps = StreamingList()
             s4_sweeps = StreamingList()
+            s4_avg_sweeps = StreamingList()
 
             dwell_time = int(kwargs['dwell_time'] * 1e9)  # ns
 
@@ -1558,7 +1564,7 @@ class SpinMeasurements:
                             print('the GUI has asked us nicely to exit')
                             return
 
-                with np.errstate(divide='ignore', invalid='ignore'):
+                """ with np.errstate(divide='ignore', invalid='ignore'):
                     norm = np.where(bg != 0, sig / bg, np.nan)
 
                 # Append RAW sweeps, not cumulative averages
@@ -1568,15 +1574,65 @@ class SpinMeasurements:
                 s1_sweeps.append(np.stack([frequencies / 1e9, s1_arr]))
                 s2_sweeps.append(np.stack([frequencies / 1e9, s2_arr]))
                 s3_sweeps.append(np.stack([frequencies / 1e9, s3_arr]))
+                s4_sweeps.append(np.stack([frequencies / 1e9, s4_arr])) """
+
+                #with np.errstate(divide='ignore', invalid='ignore'):
+                    #norm = np.where(bg != 0, sig / bg, np.nan)
+
+                # Store raw sweep from this iteration
+                signal_sweeps.append(np.stack([frequencies / 1e9, sig]))
+                background_sweeps.append(np.stack([frequencies / 1e9, bg]))
+                s1_sweeps.append(np.stack([frequencies / 1e9, s1_arr]))
+                s2_sweeps.append(np.stack([frequencies / 1e9, s2_arr]))
+                s3_sweeps.append(np.stack([frequencies / 1e9, s3_arr]))
                 s4_sweeps.append(np.stack([frequencies / 1e9, s4_arr]))
+
+                """ # Compute cumulative averages across completed iterations
+                signal_avg = np.nanmean(np.array([x[1] for x in signal_sweeps]), axis=0)
+                background_avg = np.nanmean(np.array([x[1] for x in background_sweeps]), axis=0)
+                # sig_avg structure for GUI
+                signal_avg_struct = np.stack([frequencies / 1e9, signal_avg])
+                sig_avg_sweeps.append(signal_avg_struct)
+                background_avg_struct = np.stack([frequencies / 1e9, background_avg])
+                bg_avg_sweeps.append(background_avg_struct) """
+
+                """ with np.errstate(divide='ignore', invalid='ignore'):
+                    norm_avg = np.where(background_avg != 0, (signal_avg - background_avg)/(signal_avg + background_avg), np.nan)
+                    norm_avg_struct = np.stack([frequencies / 1e9, norm_avg]) """
+                # For each iteration, after acquiring sig and bg for this sweep:
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    norm = np.where(bg != 0, (sig - bg) / (sig + bg), np.nan)
+                norm_sweeps.append(np.stack([frequencies / 1e9, norm]))
+
+                #norm_sweeps.append(norm_avg_struct)
+                #norm_avg_sweeps.append(norm_avg_struct)
+
+                s1_avg = np.nanmean(np.array([x[1] for x in s1_sweeps]), axis=0)
+                s1_avg_struct = np.stack([frequencies / 1e9, s1_avg])
+                s1_avg_sweeps.append(s1_avg_struct)
+                s2_avg = np.nanmean(np.array([x[1] for x in s2_sweeps]), axis=0)
+                s2_avg_struct = np.stack([frequencies / 1e9, s2_avg])
+                s2_avg_sweeps.append(s2_avg_struct)
+                s3_avg = np.nanmean(np.array([x[1] for x in s3_sweeps]), axis=0)
+                s3_avg_struct = np.stack([frequencies / 1e9, s3_avg])
+                s3_avg_sweeps.append(s3_avg_struct)
+                s4_avg = np.nanmean(np.array([x[1] for x in s4_sweeps]), axis=0)
+                s4_avg_struct = np.stack([frequencies / 1e9, s4_avg])
+                s4_avg_sweeps.append(s4_avg_struct)
 
                 signal_sweeps.updated_item(-1)
                 background_sweeps.updated_item(-1)
+                """ sig_avg_sweeps.updated_item(-1)
+                bg_avg_sweeps.updated_item(-1) """
                 norm_sweeps.updated_item(-1)
-                s1_sweeps.updated_item(-1)
+                """ s1_sweeps.updated_item(-1)
                 s2_sweeps.updated_item(-1)
                 s3_sweeps.updated_item(-1)
                 s4_sweeps.updated_item(-1)
+                s1_avg_sweeps.updated_item(-1)
+                s2_avg_sweeps.updated_item(-1)
+                s3_avg_sweeps.updated_item(-1)
+                s4_avg_sweeps.updated_item(-1) """
 
                 odmr_data.push({
                     'params': {
@@ -1588,14 +1644,33 @@ class SpinMeasurements:
                     'title': 'Optically Detected Magnetic Resonance',
                     'xlabel': 'Frequency (GHz)',
                     'ylabel': 'Counts/s',
-                    'datasets': {
+                    #'datasets': {
+                    #    'signal': signal_sweeps,
+                    #    'background': background_sweeps,
+                    #    'norm': norm_sweeps,
+                    #    's1': s1_sweeps,
+                    #    's2': s2_sweeps,
+                    #    's3': s3_sweeps,
+                    #    's4': s4_sweeps,
+                   # },
+                   'datasets': {
                         'signal': signal_sweeps,
                         'background': background_sweeps,
-                        'norm': norm_sweeps,
+                         #'norm': norm_sweeps,
+                        'signal_avg': sig_avg_sweeps,
+                        'background_avg': bg_avg_sweeps,
+                        'norm_avg': norm_sweeps,
+
                         's1': s1_sweeps,
                         's2': s2_sweeps,
                         's3': s3_sweeps,
                         's4': s4_sweeps,
+
+                        # To debug
+                        #'s1_avg': s1_avg_sweeps if s1_avg_sweeps else [np.zeros_like(s1_arr)],
+                        #'s2_avg': s2_avg_sweeps if s2_avg_sweeps else [np.zeros_like(s2_arr)],
+                        #'s3_avg': s3_avg_sweeps if s3_avg_sweeps else [np.zeros_like(s3_arr)],
+                        #'s4_avg': s4_avg_sweeps if s4_avg_sweeps else [np.zeros_like(s4_arr)],
                     },
                 })
 
@@ -4070,11 +4145,13 @@ class SpinMeasurements:
 
     def T1_run_R2(self, **kwargs):
         """
-        By Rolando, Jan 2026
+        By Rolando, May 2026
         Adapt. of TX's T1_run for Nspyre gui_T1.
         """
 
         with InstrumentGateway() as gw, DataSource('T1') as t1_data:
+
+            np.set_printoptions(precision=6)
 
             if kwargs['tau_type']=='linear':
                 tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
@@ -4095,190 +4172,170 @@ class SpinMeasurements:
             # TXZ: The reason we have this first 1ns data point (but throw it away when plotting) is to warm up the experimental setup and qubit
             num_tau = len(tau_times)
 
-            init_time, read_time = kwargs['init_time']*1e9, kwargs['read_time']*1e9
-            seq_gap = kwargs['seq_gap']*1e9
+            signal_sweeps = StreamingList()
+            background_sweeps = StreamingList()
+            #norm_sweeps = StreamingList()
 
+            if kwargs['seq'] == 'T1':
+                title = 'T1 Relaxometry'
+            elif kwargs['seq'] == 'Optical T1':
+                title = 'Optical T1 Relaxometry'
+
+            # Verify pi pulse is either x or y and convert to ns for pulse streamer
+            if kwargs['pi_xy'] not in ['x', 'y']:
+                raise ValueError("pi pulse must be x or y!")
+            elif kwargs['pi_xy'] == 'x':
+                pi_dur = kwargs['pi_x'] # [ns] units for pulse streamer
+            elif kwargs['pi_xy'] == 'y':
+                pi_dur = kwargs['pi_y'] # [ns] units for pulse streamer
+
+
+            # Set Pulse Streamer sequence
+            t1_seq = gw.ps.T1_R(pi_dur*1e9, tau_times, kwargs['pi_xy'],
+                                kwargs['init_time']*1e9, kwargs['read_time']*1e9, kwargs['las_to_pulse']*1e9,
+                                kwargs['T1 type'])
+            
             """ Time Tagger Channel, Trigger Level and Counting Event Setup """
             tt_gate_ch = 1
             tt_sync_ch = 2
             tt_spcm_ch = 3
-
             gw.daq.set_trigger_level(tt_gate_ch, 1.3)   # Gate channel trigger level
             gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
             gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
 
-            if kwargs['seq'] == 'MW T1':
-                # Set TimeTagger params.
-                # num. of events to be read by CountsBetweenMarkers (n_values)
-                n_values = 2*kwargs['runs']*num_tau
-
-                if kwargs['xy'] == 'x':
-                        pi_pulse = kwargs['pi_x']*1e9 # [ns] units for pulse streamer
-                elif kwargs['xy'] == 'y':
-                    pi_pulse = kwargs['pi_y']*1e9
-                else:
-                    raise ValueError("MW pulse must be x or y!")
-                
-                print("PI PULSE T1 TIME: ", pi_pulse)
-
-                # set initial parameters for instrument server devices
-                print("USING SRS FOR T1 MEASUREMENT.")
-                # Review and adapt if necessary ps.Diff_T1 seq. Go to 2nd section below.
-                ps_seq = gw.ps.Diff_T1_R(tau_times, tau_balance, kwargs['xy'], pi_pulse, init_time, read_time, seq_gap)
-                # Setup the MW
-                gw.sg.set_frequency(kwargs['freq'])
-                gw.sg.set_rf_amplitude(kwargs['rf_power'])
-                gw.sg.set_mod_type(6) # IQ modulation
-                gw.sg.set_qmod_function(5) # External modulation
-                gw.sg.set_mod_toggle(1)
-                gw.sg.set_rf_toggle(1)
-
-
-            elif kwargs['seq'] == 'Optical T1 NV':
-                # Set TimeTagger params.
-                # num. of events to be read by CountsBetweenMarkers (n_values)
-                n_values = 2*kwargs['runs']*num_tau
-                
-                #t1_buffer = [ni_sample_buffer]
-                ps_seq = gw.ps.Optical_T1_R(tau_times, tau_balance, init_time, read_time, seq_gap, forNV=True)
-                
-            elif kwargs['seq'] == 'Optical T1 General':
-                # Set TimeTagger params.
-                # num. of events to be read by CountsBetweenMarkers (n_values)
-                n_values = 2*kwargs['runs']*num_tau
-                
-                ps_seq = gw.ps.Optical_T1_R(tau_times, tau_balance, init_time, read_time, seq_gap, forNV=False)
-
-            elif kwargs['seq'] == 'T1rho':
-                # Set TimeTagger params.
-                # num. of events to be read by CountsBetweenMarkers (n_values)
-                n_values = 2*kwargs['runs']*num_tau
-
-                print("USING SRS FOR T1_rho (Dressed State T1) MEASUREMENT.")
-                ps_seq = gw.ps.Diff_T1rho_R(tau_times, tau_balance, kwargs['pihalf_y']*1e9, init_time, read_time, seq_gap)
-                # Setup the MW
-                gw.sg.set_frequency(kwargs['freq'])
-                gw.sg.set_rf_amplitude(kwargs['rf_power'])
-                gw.sg.set_mod_type(6) # IQ modulation
-                gw.sg.set_qmod_function(5) # External modulation
-                gw.sg.set_mod_toggle(1)
-                gw.sg.set_rf_toggle(1)
-            else:
-                raise ValueError("sequence must be MW T1 or Optical T1!")
-            
-            print("pulse sequence is:\n",ps_seq)
-            # Turn on the laser
-            gw.ps.laser_on()
-            gw.laser.las_mode()
+            """ Set Laser Parameters """
+            gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['laser_power'])
             gw.laser.on()
-            # Open a DAQ task for readout
-            # gw.daq.open_task(len(t1_buffer[0]))
 
-            ms1_sweeps = StreamingList()
-            ms0_sweeps = StreamingList()
+            """ Set MW Parameters """
+            gw.sg.set_rf_amplitude(kwargs['rf_power'])
+            gw.sg.set_mod_type(6)       # IQ
+            gw.sg.set_qmod_function(5)  # external
+            gw.sg.set_mod_toggle(1)
+            gw.sg.set_rf_toggle(1)
+            gw.sg.set_frequency(kwargs['freq'])
 
-            with tqdm(total = kwargs['iters']) as pbar:
+            def _read_cbm(expected_bins: int, label: str):
+                counts = np.asarray(obtain(gw.daq.count_BM()), dtype=np.float64).ravel()
+                binwidths = np.asarray(obtain(gw.daq.cbm_get_BinWidths()), dtype=np.float64).ravel()
 
-                for iter in range(kwargs['iters']):
-                    
-                    if kwargs['seq'] == 'MW T1' or kwargs['seq'] == 'T1rho':
-                        # Change read function below for the Time Tagger equivalent.
-                        gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, n_values) 
-                        gw.daq.CBM_start()
-                        gw.daq.sync()
-                        gw.ps.stream(obtain(ps_seq), 1) 
-                        print(1)
-                        ready = False
-                        while ready is False:
-                            ready = gw.daq.cbm_ready()
-                            counts = gw.daq.count_BM()
+                if counts.size != expected_bins or binwidths.size != expected_bins:
+                    raise RuntimeError(
+                        f"{label}: expected {expected_bins} CBM bins, got "
+                        f"{counts.size} counts and {binwidths.size} widths."
+                    )
 
-                        t1_result = counts[0]
+                if np.any(binwidths <= 0):
+                    raise RuntimeError(f"{label}: non-positive CBM bin width encountered.")
 
-                        # partition buffer into signal and background datasets
-                        # Review function below to match Time Tagger readout
-                        ms1, ms0 = self.digital_math(t1_result, 'MW_T1', num_tau)
-                        
-                        #print('\nms0 here is:\n',ms0)
-                        # delete the "1 ns" data point from the set and use the rest for plotting
-                        ms1 = np.delete(ms1, 0)
-                        ms0 = np.delete(ms0, 0)
-                        
-                        # sort back the data to the correct order
-                        ms1 = np.array([ms1[i] for i in index_order])
-                        ms0 = np.array([ms0[i] for i in index_order])
-                        #print("\n shape ms1:\n", np.shape(ms1))
-                        #print("\n type ms1[0]:\n", type(ms1[0]))
-                        ms1_sweeps.append(np.stack([x_axis_data, ms1]))
-                        ms0_sweeps.append(np.stack([x_axis_data, ms0]))
-                        # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        ms1_sweeps.updated_item(-1)
-                        ms0_sweeps.updated_item(-1)
-                        #print('\nMW ms1_sweeps here is:\n',ms1_sweeps)
-                        t1_data.push({'params': {'tau_num': kwargs['num_pts'], 'iter_num': kwargs['iters'],'runs_num': kwargs['runs']},
-                                    'title': 'MW T1',
-                                    'xlabel': 'Total Time (ns)',
-                                    'ylabel': 'Counts',
-                                    'datasets': {'ms1' : ms1_sweeps,
-                                                'ms0': ms0_sweeps}
-                                    })
-                        
-                    elif kwargs['seq'] == 'Optical T1 NV' or kwargs['seq'] == 'Optical T1 General':
-                            # Change read function below for the Time Tagger equivalent.
-                            gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, n_values) 
-                            gw.daq.CBM_start()
-                            gw.daq.sync()
-                            gw.ps.stream(obtain(ps_seq), 1) 
-                            print(1)
-                            ready = False
-                            while ready is False:
-                                ready = gw.daq.cbm_ready()
-                                counts = gw.daq.count_BM()
+                return counts, binwidths
 
-                            t1_result = counts[0]
-                            #print('\n t1_result:\n',t1_result)
-                            ms1 = self.digital_math(t1_result, 'Optical T1', num_tau)
-                            ms1 = np.delete(ms1, 0)
-                            #ms0 = np.delete(ms0, 0)
-                            # sort back the data to the correct order
-                            ms1 = np.array([ms1[i] for i in index_order])
-                            #ms0 = np.array([ms0[i] for i in index_order])
-                            #print("\n shape ms1:\n", np.shape(ms1))
-                            #print("\n type ms1[0]:\n", type(ms1[0]))
-                            #print("\n ms1:\n",ms1)
-                            ms0 = ms1
-                            ms1_sweeps.append(np.stack([x_axis_data, ms1]))
-                            ms0_sweeps.append(np.stack([x_axis_data, ms0]))
-                            #print(ms1_sweeps)
-                            #ms0_sweeps = ms1_sweeps
-                            # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                            ms1_sweeps.updated_item(-1)
-                            ms0_sweeps.updated_item(-1)
-                            #
-                            #print('\nOptical ms1_sweeps here is:\n',ms1_sweeps)
-                            t1_data.push({'params': {'tau_num': kwargs['num_pts'], 'iter_num': kwargs['iters'],'runs_num': kwargs['runs']},
-                                        'title': 'MW T1',
-                                        'xlabel': 'Total Time (ns)',
-                                        'ylabel': 'Counts',
-                                        'datasets': {'ms1' : ms1_sweeps,
-                                                    'ms0': ms0_sweeps}
-                                        })
-                    else:
-                        raise ValueError("sequence must be MW T1 or Opitcal T1 NV or Optical T1 General or T1rho!")
-                    if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                        gw.daq.free_time_tagger()
-                        gw.sg.set_rf_toggle(0)
-                        gw.sg.set_mod_toggle(0)
-                        gw.ps.ps_reset()
-                        gw.laser.off()
-                        print('the GUI has asked us nicely to exit')
-                        return
-                    pbar.update(1)
-                gw.daq.free_time_tagger()
-                gw.sg.set_rf_toggle(0)
-                gw.sg.set_mod_toggle(0)
-                gw.laser.off()
-                gw.ps.ps_reset()  
+            def _rate_cps(counts_slice: np.ndarray, widths_slice: np.ndarray) -> float:
+                # widths are in ps; convert to counts/s
+                return 1e12 * np.sum(counts_slice) / np.sum(widths_slice)
+            
+            # Sequence execution and data acquisition
+            for iter in range(kwargs['iters']):
+                print(f"Iteration {iter + 1} of {kwargs['iters']}")
+
+                # RAW sweeps for this iteration only
+                #sig = np.full(kwargs['num_points'], np.nan, dtype=float)
+                #bg = np.full(kwargs['num_points'], np.nan, dtype=float)
+
+                time.sleep(0.01)
+
+                # Seq. streaming and CBM Acquisition
+                expected_bins = 2 * num_tau * kwargs['runs']
+
+                gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                gw.daq.cbm_clear()
+                gw.daq.CBM_start()
+                gw.daq.sync()
+
+                # Sequence was built for ONE run, so repeat it here
+                gw.ps.stream(obtain(t1_seq), kwargs['runs'])
+
+                while not gw.daq.cbm_ready():
+                    time.sleep(0.001)
+
+                counts, binwidths = _read_cbm(expected_bins, 'T1')
+
+                #sig = _rate_cps(counts[0::2], binwidths[0::2])
+                #bg = _rate_cps(counts[1::2], binwidths[1::2])
+
+                sig_counts = counts[0::2].reshape(kwargs['runs'], num_tau)
+                bg_counts = counts[1::2].reshape(kwargs['runs'], num_tau)
+
+                sig_widths = binwidths[0::2].reshape(kwargs['runs'], num_tau)
+                bg_widths = binwidths[1::2].reshape(kwargs['runs'], num_tau)
+
+                ms1 = 1e12 * sig_counts.sum(axis=0) / sig_widths.sum(axis=0)
+                ms0 = 1e12 * bg_counts.sum(axis=0) / bg_widths.sum(axis=0)
+
+                # Remove the warm-up 1 ns point
+                ms1 = np.delete(ms1, 0)
+                ms0 = np.delete(ms0, 0)
+
+                # Restore original tau order
+                ms1 = np.array([ms1[i] for i in index_order])
+                ms0 = np.array([ms0[i] for i in index_order])
+
+                signal_sweeps.append(np.stack([tau_times / 1e3, ms1]))
+                background_sweeps.append(np.stack([tau_times / 1e3, ms0]))
+                
+
+
+                if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                    gw.sg.set_rf_toggle(0)
+                    gw.sg.set_mod_toggle(0)
+                    gw.ps.ps_reset()
+                    gw.laser.get_power()
+                    gw.laser.set_power(0)
+                    gw.ps.just_gate_off()
+                    gw.laser.off()
+                    print('the GUI has asked us nicely to exit')
+                    return
+                
+                #with np.errstate(divide='ignore', invalid='ignore'):
+                #    norm = np.where(bg != 0, sig / bg, np.nan)
+                # Append RAW sweeps, not cumulative averages
+                #signal_sweeps.append(np.stack([tau_times / 1e3, sig]))
+                #background_sweeps.append(np.stack([tau_times / 1e3, bg]))
+                #norm_sweeps.append(np.stack([tau_times / 1e3, norm]))
+                # Streaming list update and push to data server
+                #signal_sweeps.updated_item(-1)
+                #background_sweeps.updated_item(-1)
+                #norm_sweeps.updated_item(-1)
+
+                t1_data.push({
+                    'params': {
+                        'start': kwargs['start'],
+                        'stop': kwargs['stop'],
+                        'num_points': kwargs['num_pts'],
+                        'iterations': kwargs['iters'],
+                        'runs': kwargs['runs'],
+                    },
+                    'title': title,
+                    'xlabel': 'τ (µs)',
+                    'ylabel': 'Counts/s',
+                    'datasets': {
+                        'signal': signal_sweeps,
+                        'background': background_sweeps,
+                    },
+                })
+
+            gw.sg.set_mod_toggle(0)
+            gw.sg.set_rf_toggle(0)
+            gw.laser.get_power()
+            gw.laser.set_power(0)
+            gw.ps.just_gate_off()
+            gw.laser.off()
+            gw.ps.constant_off()
+            gw.ps.ps_reset()
+            print("Measurement completed.")
+  
 
     def T2_run(self, **kwargs):
         '''
@@ -4450,6 +4507,168 @@ class SpinMeasurements:
             gw.sg.set_mod_toggle(0) 
             gw.ps.Pulser.reset()
             gw.laser.off()
+
+    def T2_run_R(self, **kwargs):
+        """
+        By Rolando, May 2026
+        Adapt. of TX's T2_run for Nspyre gui_T2.
+        """
+
+        with InstrumentGateway() as gw, DataSource('T2') as t2_data:
+
+            np.set_printoptions(precision=6)
+
+            if kwargs['tau_type']=='linear':
+                tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
+                x_axis_data = np.copy(tau_times)
+                tau_times = self.sort_taus_for_balance(tau_times)
+                index_order = np.argsort(tau_times)
+                tau_balance = False
+            elif kwargs['tau_type']=='exp':
+                tau_times = np.geomspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
+                x_axis_data = np.copy(tau_times)
+                np.random.shuffle(tau_times)
+                # index order of sorted mw_times used to match x and y axis order for plotting
+                index_order = np.argsort(tau_times) 
+                tau_balance = False
+            else:
+                raise ValueError("tau_type can only be linear or exp!")
+            tau_times = np.insert(tau_times, 0, 1) # insert 1 ns as first data point that will be skipped in plotting           
+            # TXZ: The reason we have this first 1ns data point (but throw it away when plotting) is to warm up the experimental setup and qubit
+            num_tau = len(tau_times)
+
+            signal_sweeps = StreamingList()
+            background_sweeps = StreamingList()
+            norm_sweeps = StreamingList()
+
+            # Set Pulse Streamer sequence
+            # Sequence selection:
+            if kwargs['seq'] == 'Ramsey':
+                t2_seq = gw.ps.Ramsey_R1(kwargs['init_time']*1e9, kwargs['wait_time']*1e9, kwargs['pi_xy'], kwargs['half_pi']*1e9, tau_times, kwargs['read_wait']*1e9, kwargs['read_time']*1e9)
+                title = 'T2* Relaxation (Ramsey)'
+            elif kwargs['seq'] == 'Spin Echo':
+                t2_seq = gw.ps.spin_echo(kwargs['init_time']*1e9, kwargs['wait_time']*1e9, kwargs['pi_xy'], kwargs['half_pi']*1e9, tau_times, kwargs['read_wait']*1e9, kwargs['read_time']*1e9)
+                title = 'T2 Relaxation (Spin Echo)'
+            
+            """ Time Tagger Channel, Trigger Level and Counting Event Setup """
+            tt_gate_ch = 1
+            tt_sync_ch = 2
+            tt_spcm_ch = 3
+            gw.daq.set_trigger_level(tt_gate_ch, 1.3)   # Gate channel trigger level
+            gw.daq.set_trigger_level(tt_sync_ch, 1.3)   # Sync channel trigger level
+            gw.daq.set_trigger_level(tt_spcm_ch, 1.1)   # SPCM channel trigger level
+
+            """ Set Laser Parameters """
+            gw.laser.cw_mode()
+            gw.laser.get_power()
+            gw.laser.set_power(kwargs['laser_power'])
+            gw.laser.on()
+
+            """ Set MW Parameters """
+            gw.sg.set_rf_amplitude(kwargs['mw_power'])
+            gw.sg.set_mod_type(6)       # IQ
+            gw.sg.set_qmod_function(5)  # external
+            gw.sg.set_mod_toggle(1)
+            gw.sg.set_rf_toggle(1)
+            gw.sg.set_frequency(kwargs['freq'])
+
+            def _read_cbm(expected_bins: int, label: str):
+                counts = np.asarray(obtain(gw.daq.count_BM()), dtype=np.float64).ravel()
+                binwidths = np.asarray(obtain(gw.daq.cbm_get_BinWidths()), dtype=np.float64).ravel()
+
+                if counts.size != expected_bins or binwidths.size != expected_bins:
+                    raise RuntimeError(
+                        f"{label}: expected {expected_bins} CBM bins, got "
+                        f"{counts.size} counts and {binwidths.size} widths."
+                    )
+
+                if np.any(binwidths <= 0):
+                    raise RuntimeError(f"{label}: non-positive CBM bin width encountered.")
+
+                return counts, binwidths
+
+            def _rate_cps(counts_slice: np.ndarray, widths_slice: np.ndarray) -> float:
+                # widths are in ps; convert to counts/s
+                return 1e12 * np.sum(counts_slice) / np.sum(widths_slice)
+            
+            # Sequence execution and data acquisition
+            for iter in range(kwargs['iterations']):
+                print(f"Iteration {iter + 1} of {kwargs['iterations']}")
+
+                # RAW sweeps for this iteration only
+                #sig = np.full(kwargs['num_points'], np.nan, dtype=float)
+                #bg = np.full(kwargs['num_points'], np.nan, dtype=float)
+
+                time.sleep(0.01)
+
+                # Seq. streaming and CBM Acquisition
+                expected_bins = 2 * num_tau * kwargs['runs']
+
+                gw.daq.start_cbm(tt_spcm_ch, tt_gate_ch, -tt_gate_ch, expected_bins)
+                gw.daq.cbm_clear()
+                gw.daq.CBM_start()
+                gw.daq.sync()
+
+                # Sequence was built for ONE run, so repeat it here
+                gw.ps.stream(obtain(t2_seq), kwargs['runs'])
+
+                while not gw.daq.cbm_ready():
+                    time.sleep(0.001)
+
+                counts, binwidths = _read_cbm(expected_bins, 'CW ODMR')
+
+                sig = _rate_cps(counts[0::2], binwidths[0::2])
+                bg = _rate_cps(counts[1::2], binwidths[1::2])
+
+                if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                    gw.sg.set_rf_toggle(0)
+                    gw.sg.set_mod_toggle(0)
+                    gw.ps.ps_reset()
+                    gw.laser.get_power()
+                    gw.laser.set_power(0)
+                    gw.ps.just_gate_off()
+                    gw.laser.off()
+                    print('the GUI has asked us nicely to exit')
+                    return
+                
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    norm = np.where(bg != 0, sig / bg, np.nan)
+                # Append RAW sweeps, not cumulative averages
+                signal_sweeps.append(np.stack([tau_times / 1e3, sig]))
+                background_sweeps.append(np.stack([tau_times / 1e3, bg]))
+                norm_sweeps.append(np.stack([tau_times / 1e3, norm]))
+                # Streaming list update and push to data server
+                signal_sweeps.updated_item(-1)
+                background_sweeps.updated_item(-1)
+                norm_sweeps.updated_item(-1)
+
+                t2_data.push({
+                    'params': {
+                        'start': kwargs['start'],
+                        'stop': kwargs['stop'],
+                        'num_points': kwargs['num_pts'],
+                        'iterations': kwargs['iters'],
+                    },
+                    'title': title,
+                    'xlabel': 'τ (µs)',
+                    'ylabel': 'Counts/s',
+                    'datasets': {
+                        'signal': signal_sweeps,
+                        'background': background_sweeps,
+                        'norm': norm_sweeps,
+
+                    },
+                })
+
+            gw.sg.set_mod_toggle(0)
+            gw.sg.set_rf_toggle(0)
+            gw.laser.get_power()
+            gw.laser.set_power(0)
+            gw.ps.just_gate_off()
+            gw.laser.off()
+            gw.ps.constant_off()
+            gw.ps.ps_reset()
+            print("Measurement completed.")
 
     def Correlation_Spectroscopy_run(self, **kwargs):
         '''

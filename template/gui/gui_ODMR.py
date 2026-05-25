@@ -210,9 +210,9 @@ self.setLayout(layout)
 """
 def process_ODMR_data(sink: DataSink):
     """Subtract the signal from background trace and add it as a new 'diff' dataset."""
-    diff_sweeps = []
-    div_sweeps = []
-    divnow_sweeps = []
+    #diff_sweeps = []
+    ratio = []
+    #divnow_sweeps = []
     norm_sweeps = [] #create normalization plot -A.K 11/19/2025
     s1 = []
     s2 = []
@@ -221,37 +221,68 @@ def process_ODMR_data(sink: DataSink):
 
     for s,_ in enumerate(sink.datasets['signal']):
         freqs = sink.datasets['signal'][s][0]
+        #sig = sink.datasets['signal_avg'][s][1]
+        #bg = sink.datasets['background_avg'][s][1]
         sig = sink.datasets['signal'][s][1]
         bg = sink.datasets['background'][s][1]
-        s1_data = sink.datasets['s1'][s][1] 
-        s2_data = sink.datasets['s2'][s][1]  
-        s3_data = sink.datasets['s3'][s][1]
-        s4_data = sink.datasets['s4'][s][1]
+
+        #norm = sink.datasets['norm_avg'][s][1]
+        # To debug code below 2026-5-22 Rolando A. Fimbres G.
+        """ 
+        s1_data = sink.datasets['s1_avg_sweeps']#[s][1] 
+        s2_data = sink.datasets['s2_avg_sweeps']#[s][1]  
+        s3_data = sink.datasets['s3_avg_sweeps']#[s][1]
+        s4_data = sink.datasets['s4_avg_sweeps']#[s][1]
         
         s1.append(np.stack([freqs, s1_data]))
         s2.append(np.stack([freqs, s2_data]))
         s3.append(np.stack([freqs, s3_data]))
-        s4.append(np.stack([freqs, s4_data]))
+        s4.append(np.stack([freqs, s4_data])) """
 
         # Avoid division by zero or invalid values
         # sig[sig == 0] = np.nan
         bg = bg.astype(float)
         bg[bg == 0] = np.nan
 
-        diff_sweeps.append(np.stack([freqs, sig - bg]))
-        div_sweeps.append(np.stack([freqs, sig/bg]))
-        with np.errstate(divide='ignore', invalid='ignore'):
-            norm = np.where(bg != 0, sig / bg, np.nan) #Updated by Rolando 3/31/2026 to handle division by zero more gracefully
+        #diff_sweeps.append(np.stack([freqs, sig - bg]))
+        ratio.append(np.stack([freqs, sig/bg]))
+        #with np.errstate(divide='ignore', invalid='ignore'):
+        #   norm = np.where(bg != 0, abs(sig-bg)/(bg+sig), np.nan) #Updated by Rolando 3/31/2026 to handle division by zero more gracefully
             #norm = np.where(bg > 0, sig / bg, np.nan)
-        norm_sweeps.append(np.stack([freqs, norm]))
+        #norm_sweeps.append(np.stack([freqs, norm]))
         #divnow_sweeps.append(np.stack([freqs, np.mean(sink.datasets['signal'][:s][1],axis=0)/np.mean(sink.datasets['background'][:s][1],axis=0)]))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            norm = np.where(bg != 0, np.abs(sig - bg) / (bg + sig), np.nan)
+        norm_sweeps.append(np.stack([freqs, norm]))
 
-
-    sink.datasets['diff'] = diff_sweeps
-    sink.datasets['div'] = div_sweeps
-    sink.datasets['div_now'] = divnow_sweeps
-    sink.datasets['norm'] = norm_sweeps
+    #sink.datasets['diff'] = diff_sweeps
+    sink.datasets['div'] = ratio
+    #sink.datasets['div_now'] = divnow_sweeps
+    sink.datasets['norm_avg'] = norm_sweeps
     #print("FF")
+
+    if sink.datasets['signal'] and sink.datasets['background']:
+        freqs = sink.datasets['signal'][0][0]
+
+        sig_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['signal']]),
+            axis=0
+        )
+        bg_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['background']]),
+            axis=0
+        )
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            norm_from_avg = np.where(
+                (sig_mean + bg_mean) != 0,
+                np.abs(sig_mean - bg_mean) / (sig_mean + bg_mean),
+                np.nan
+            )
+
+        sink.datasets['norm_from_avg'] = [
+            np.stack([freqs, norm_from_avg])
+        ]
 
     # Fit the averaged normalized ODMR trace. Added by Rolando A. Fimbres G. 3/30/2026
     """sink.datasets['odmr_fit'] = []
@@ -298,28 +329,40 @@ class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
         # create some default average plots
         self.add_plot('sig_avg',        series='signal',   scan_i='',     scan_j='',  processing='Average')
         self.add_plot('bg_avg',         series='background',   scan_i='',     scan_j='',  processing='Average')
-        self.add_plot('norm_avg',       series='norm',  scan_i='',      scan_j='',  processing='Average') # add normalized plot to main plots -A.K 11/19/2025
+        #self.add_plot('norm_avg',       series='norm_avg',  scan_i='',      scan_j='',  processing='Average') # add normalized plot to main plots -A.K 11/19/2025
 
         self.add_plot('odmr_fit', series = 'odmr_fit', scan_i='', scan_j='', processing='Average') # Added by Rolando A. Fimbres G. 3/30/2026
         self.hide_plot('odmr_fit')
 
-        self.add_plot('s1_avg',        series='s1',  scan_i='',     scan_j='',  processing='Average')
-        self.add_plot('s2_avg',        series='s2',  scan_i='',     scan_j='',  processing='Average')
-        self.add_plot('s3_avg',        series='s3',  scan_i='',     scan_j='',  processing='Average')
-        self.add_plot('s4_avg',        series='s4',  scan_i='',     scan_j='',  processing='Average')
+        """ self.add_plot('s1_avg',        series='s1_avg_sweeps',  scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('s2_avg',        series='s2_avg_sweeps',  scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('s3_avg',        series='s3_avg_sweeps',  scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('s4_avg',        series='s4_avg_sweeps',  scan_i='',     scan_j='',  processing='Average')
         self.hide_plot('s1_avg')
         self.hide_plot('s2_avg')
         self.hide_plot('s3_avg')
-        self.hide_plot('s4_avg')
+        self.hide_plot('s4_avg') """
 
-        self.add_plot('div_avg',       series='div',  scan_i='',      scan_j='',  processing='Average')
+        self.add_plot('ratio_avg',       series='div',  scan_i='',      scan_j='',  processing='Average')
+        self.hide_plot('ratio_avg')
+
+        self.add_plot(
+            'norm_from_avg',
+            series='norm_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('norm_from_avg')
+
+        """ self.add_plot('div_avg',       series='div',  scan_i='',      scan_j='',  processing='Average')
         self.hide_plot('div_avg')
         self.add_plot('div_now',       series='div_now',  scan_i='-1',      scan_j='',  processing='Average')
         self.hide_plot('div_now')
         self.add_plot('diff_avg',       series='diff',  scan_i='',      scan_j='',  processing='Average')
-        self.hide_plot('diff_avg')
+        self.hide_plot('diff_avg') """
         # create some plot that not frequently used, so we hide them
-        self.add_plot('sig_latest',     series='signal',   scan_i='-1',   scan_j='',  processing='Average')
+        """ self.add_plot('sig_latest',     series='signal',   scan_i='-1',   scan_j='',  processing='Average')
         self.add_plot('sig_first',      series='signal',   scan_i='0',    scan_j='1', processing='Average')
         self.add_plot('sig_latest_10',  series='signal',   scan_i='-10',  scan_j='',  processing='Average')
         self.hide_plot('sig_latest')
@@ -337,7 +380,7 @@ class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
         self.hide_plot('div_latest')
 
         self.add_plot('norm_latest',    series='norm',  scan_i='-1',    scan_j='',  processing='Average')
-        self.hide_plot('norm_latest')
+        self.hide_plot('norm_latest') """
         # manually set the XY range
         #self.line_plot.plot_item().setXRange(3.0, 4.0)
         #self.line_plot.plot_item().setYRange(-3000, 4500)

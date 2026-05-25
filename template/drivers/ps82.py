@@ -465,7 +465,7 @@ class PS82():
         """
         New_CW_ODMR_R
         :param self: Description
-        :param dwell_time: Duration of a single measurement point
+        :param dwell_time: 
         :param buffer_time: Buffer time (off) before and after the readout window
         :param runs: Runs of the sequence at the same frequency point
 
@@ -1435,7 +1435,7 @@ class PS82():
         return seqs
 
 
-    def T1_R(self, pi_dur, tau_times, pi_xy, init_time, read_time, wait_time):
+    def T1_R(self, pi_dur, tau_times, pi_xy, init_time, read_time, wait_time, seq):
         '''
         T1 sequence
         init_time: laser duration for initialize the qubit
@@ -1476,16 +1476,145 @@ class PS82():
             single_T1.setAnalog(1, mw_Q_patt)
 
             return single_T1
+        
+        def Opt_T1(tau_times):
+            cycle_dur = int(2*(laser_init + laser_off))
+            laser_off = laser_mw_gap + tau_times
+            read_off = laser_init - read_time + laser_off
+            
+            spcm_gate = [(cycle_dur, 1)]
+            laser_patt = [(laser_init, 1), (laser_off, 0), (laser_init, 1), (laser_off, 0)]
+            read_patt = [(laser_lag, 0), (read_time, 1), (read_off, 0), (read_time, 1), (read_off - laser_lag, 0)]
+
+            opt_T1 = self.ps.createSequence()
+            opt_T1.setDigital(self.channel_r["spcm_gate"], spcm_gate)
+            opt_T1.setDigital(self.channel_r["laser"], laser_patt)
+            opt_T1.setDigital(self.channel_r["vrt_gate"], read_patt)
+
+            return opt_T1
 
         full_T1_seq = self.ps.createSequence()
 
-        for t in tau_times:
-            tau = int(t)
-            T1_seq = Single_T1(tau)
-            full_T1_seq += T1_seq
+        if seq == "Optical T1":
+            for t in tau_times:
+                tau = int(t)
+                T1_seq = Opt_T1(tau)
+                full_T1_seq += T1_seq
+        elif seq == "T1":
+            for t in tau_times:
+                tau = int(t)
+                T1_seq = Single_T1(tau)
+                full_T1_seq += T1_seq
 
         return full_T1_seq
+    
+    def Ramsey_R1(self, init_time, las_mw, pi_xy, half_pi, tau_time, tau_read, read_time):
+        '''
+        Ramsey sequence:
+        init_time: laser duration for initialize the qubit
+        las_mw: waiting duration between the end of the initialization laser and the start of the first MW pulse
+        half_pi: duration of the pi/2 pulse
+        tau_time: spin evolution time
+        tau_read: waiting duration between the end of the tau_time and the start of the readout laser
+        '''
+        laser_lag = self.laser_lag
+        laser_init = int(init_time)
+        laser_mw_gap = int(las_mw)
+        half_pi = int(half_pi)
+        tau_time = int(tau_time)
+        tau_read = int(tau_read)
+        read_time = int(read_time)
+
+        if pi_xy == 'x':
+            self.IQ_ON = self.IQpx
+        elif pi_xy == 'y':
+            self.IQ_ON = self.IQpy
+        else:
+            raise ValueError("pi_xy must be 'x' or 'y'!")
+        
+        def Single_Ramsey(tau_times):
+            cycle_dur = int(2*(laser_init + laser_off))
+            laser_off = laser_mw_gap + half_pi + tau_times + half_pi + tau_read
+            mw_off1 = laser_init + laser_mw_gap
+            mw_off2 = tau_read + laser_init + laser_off
+            read_off = laser_init - read_time + laser_off
+           
+            spcm_gate = [(cycle_dur, 1)]
+            laser_patt = [(laser_init, 1), (laser_off, 0), (laser_init, 1), (laser_off, 0)]
+            mw_I_patt = [(mw_off1, self.IQ0[0]), (half_pi, self.IQpx[0]),(tau_time, self.IQ0[0]), (half_pi, self.IQpx[0]), (mw_off2, self.IQ0[0])]
+            mw_Q_patt = [(mw_off1, self.IQ0[1]), (half_pi, self.IQpx[1]),(tau_time, self.IQ0[0]), (half_pi, self.IQpx[0]), (mw_off2, self.IQ0[1])]
+            read_patt = [(laser_lag, 0), (read_time, 1), (read_off, 0), (read_time, 1), (read_off - laser_lag, 0)]
+
+            single_Ramsey = self.ps.createSequence()
+            single_Ramsey.setDigital(self.channel_r["spcm_gate"], spcm_gate)
+            single_Ramsey.setDigital(self.channel_r["laser"], laser_patt)
+            single_Ramsey.setDigital(self.channel_r["vrt_gate"], read_patt)
+            single_Ramsey.setAnalog(0, mw_I_patt)
+            single_Ramsey.setAnalog(1, mw_Q_patt)
+
+            return single_Ramsey
+        
+        full_Ramsey_seq = self.ps.createSequence()
+        for t in tau_time:
+            tau = int(t)
+            Ramsey_seq = Single_Ramsey(tau)
+            full_Ramsey_seq += Ramsey_seq
+
+        return full_Ramsey_seq
+    
+    def spin_echo(self, init_time, las_mw, pi_xy, half_pi, tau_time, tau_read, read_time):
+        '''
+        Spin echo sequence:
+        init_time: laser duration for initialize the qubit
+        las_mw: waiting duration between the end of the initialization laser and the start of the first MW pulse
+        half_pi: duration of the pi/2 pulse
+        tau_time: spin evolution time
+        tau_read: waiting duration between the end of the tau_time and the start of the readout laser
+        '''
+        laser_lag = self.laser_lag
+        laser_init = int(init_time)
+        laser_mw_gap = int(las_mw)
+        half_pi = int(half_pi)
+        tau_time = int(tau_time)
+        tau_read = int(tau_read)
+        read_time = int(read_time)
+
+        if pi_xy == 'x':
+            self.IQ_ON = self.IQpx
+        elif pi_xy == 'y':
+            self.IQ_ON = self.IQpy
+        else:
+            raise ValueError("pi_xy must be 'x' or 'y'!")
+        
+        def Single_SpinEcho(tau_times):
+            cycle_dur = int(2*(laser_init + laser_off))
+            laser_off = laser_mw_gap + half_pi + tau_times + 2*half_pi + tau_times + half_pi + tau_read
+            mw_off1 = laser_init + laser_mw_gap
+            mw_off2 = tau_read + laser_init + laser_off
+            read_off = laser_init - read_time + laser_off
+           
+            spcm_gate = [(cycle_dur, 1)]
+            laser_patt = [(laser_init, 1), (laser_off, 0), (laser_init, 1), (laser_off, 0)]
+            mw_I_patt = [(mw_off1, self.IQ0[0]), (half_pi, self.IQpx[0]), (tau_time, self.IQ0[0]), (2*half_pi, self.IQpx[0]), (tau_time, self.IQ0[0]), (half_pi, self.IQpx[0]), (mw_off2, self.IQ0[0])]
+            mw_Q_patt = [(mw_off1, self.IQ0[1]), (half_pi, self.IQpx[1]), (tau_time, self.IQ0[1]), (2*half_pi, self.IQpx[1]), (tau_time, self.IQ0[1]), (half_pi, self.IQpx[1]), (mw_off2, self.IQ0[1])]
+            read_patt = [(laser_lag, 0), (read_time, 1), (read_off, 0), (read_time, 1), (read_off - laser_lag, 0)]
+
+            Single_SpinEcho = self.ps.createSequence()
+            Single_SpinEcho.setDigital(self.channel_r["spcm_gate"], spcm_gate)
+            Single_SpinEcho.setDigital(self.channel_r["laser"], laser_patt)
+            Single_SpinEcho.setDigital(self.channel_r["vrt_gate"], read_patt)
+            Single_SpinEcho.setAnalog(0, mw_I_patt)
+            Single_SpinEcho.setAnalog(1, mw_Q_patt)
+
+            return Single_SpinEcho
+        
+        full_SpinEcho_seq = self.ps.createSequence()
+        for t in tau_time:
+            tau = int(t)
+            SpinEcho_seq = Single_SpinEcho(tau)
+            full_SpinEcho_seq += SpinEcho_seq
+
+        return full_SpinEcho_seq
 
     def ps_reset(self):
         self.ps.reset()
-

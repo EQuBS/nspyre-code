@@ -45,6 +45,7 @@ class HardwareCBMScanPlan:
     axis_2_max_um: float = 10.0
     data_points: int = 10
     dwell_time_ms: float = 5.0         # passed to MCL_WfmaSetup; same convention as original code
+    average_per_pixel: int = 1         # Recently added (Rolando 5/22/2026) for hardware scan; number of CBM lines to average per pixel before display and saving.
     photon_channel: int = 3
     photon_trigger_level_v: Optional[float] = 1.0
     begin_channel: int = 4             # MCL pixel-clock input at Time Tagger
@@ -75,6 +76,7 @@ class HardwareCBMScanPlan:
     def validate(self) -> None:
         self.axis_1 = _normalize_axis(self.axis_1)
         self.axis_2 = _normalize_axis(self.axis_2)
+        self.average_per_pixel = max(1, int(self.average_per_pixel or 1))   # recently added by Rolando A. Fimbres G. 5/22/2026; ensure it's a positive integer
         if self.axis_1 == self.axis_2:
             raise ValueError("Hardware scan requires two different axes.")
         if int(self.data_points) < 2:
@@ -354,6 +356,19 @@ def _read_cbm_line(daq: Any, n_values: int, normalize_to_cps: bool,
         values = counts.copy()
     return values, counts, widths_ps
 
+# New function for averaging. By Rolando A. Fimbres G. 5/22/2026.
+def _accumulate_line(acc_values, acc_counts, acc_widths, values, counts, widths_ps):
+    if acc_values is None:
+        return (
+            np.asarray(values, dtype=float).copy(),
+            np.asarray(counts, dtype=float).copy(),
+            np.asarray(widths_ps, dtype=float).copy(),
+        )
+
+    acc_values += np.asarray(values, dtype=float)
+    acc_counts += np.asarray(counts, dtype=float)
+    acc_widths += np.asarray(widths_ps, dtype=float)
+    return acc_values, acc_counts, acc_widths
 
 def _shift_line(line: np.ndarray, shift_px: float, fill_value: float = np.nan) -> np.ndarray:
     """Return a copy of line shifted by shift_px display pixels.
@@ -649,7 +664,8 @@ def run_mcl_hardware_cbm_scan(
                 if float(plan.line_settle_ms) > 0:
                     time.sleep(float(plan.line_settle_ms) / 1000.0)
 
-                _wfma_setup_one_axis(nano, fast_axis_id, fast_forward_hw, plan.dwell_time_ms, mcl_handle)
+                # Commented for averaging implementation. Rolando A. Fimbres G. 5/22/2026.
+                """ _wfma_setup_one_axis(nano, fast_axis_id, fast_forward_hw, plan.dwell_time_ms, mcl_handle)
                 _start_cbm_line(daq, plan, nx)
                 nano.wfma_trigger(mcl_handle)
                 _wait_for_cbm_ready(daq, plan.line_timeout_s, plan.poll_interval_ms, stop_requested)
@@ -658,7 +674,43 @@ def run_mcl_hardware_cbm_scan(
                 )
                 if callable(getattr(daq, "cbm_clear", None)):
                     daq.cbm_clear()
+                last_fast_end = line_end """
+
+                ### Replacing prior commented block with averaging implementation. By Rolando A. Fimbres G. 5/22/2026. ###
+                acc_values = None
+                acc_counts = None
+                acc_widths = None
+
+                for avg_idx in range(int(plan.average_per_pixel)):
+                    if stop_requested is not None and stop_requested():
+                        break
+
+                    # Return to the start of the same line before each repeated acquisition.
+                    _move_axis(nano, fast_axis_id, line_start, mcl_handle, use_monitor=True)
+                    if float(plan.line_settle_ms) > 0:
+                        time.sleep(float(plan.line_settle_ms) / 1000.0)
+
+                    _wfma_setup_one_axis(nano, fast_axis_id, fast_forward_hw, plan.dwell_time_ms, mcl_handle)
+                    _start_cbm_line(daq, plan, nx)
+                    nano.wfma_trigger(mcl_handle)
+                    _wait_for_cbm_ready(daq, plan.line_timeout_s, plan.poll_interval_ms, stop_requested)
+
+                    v, c, w = _read_cbm_line(
+                        daq, nx, plan.normalize_to_cps, plan.use_bin_widths, plan.dwell_time_ms
+                    )
+
+                    if callable(getattr(daq, "cbm_clear", None)):
+                        daq.cbm_clear()
+
+                    acc_values, acc_counts, acc_widths = _accumulate_line(
+                        acc_values, acc_counts, acc_widths, v, c, w
+                    )
+
+                values = acc_values / float(plan.average_per_pixel)
+                counts = acc_counts / float(plan.average_per_pixel) ## 
+                widths_ps = acc_widths / float(plan.average_per_pixel)
                 last_fast_end = line_end
+                ##### end of code block replacement #####################################################################
 
                 if int(plan.edge_blank_pixels) > 0:
                     values = _blank_edges(values, plan.edge_blank_pixels)

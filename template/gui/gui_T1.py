@@ -1,7 +1,10 @@
 """
+-------------------------
 GUI element for T1
 Tian-Xing Zheng, Oct.2023
 Updated Omri Raz, Dec.2024
+---------------------------
+Adapted by Rolando A. Fimbres Grijalva, May 2026 for EQuBS Lab.
 """
 from . import spin_measurements as sm
 import numpy as np
@@ -22,6 +25,15 @@ sys.path.append('../')
 
 class T1Widget(ExperimentWidget):
     def __init__(self):
+
+        self.t1_type_combo = QtWidgets.QComboBox()
+        self.t1_type_combo.addItems(['Optical T1', 'T1'])
+        self.t1_type_combo.setCurrentText('Optical T1')
+
+        self.tau_type_combo = QtWidgets.QComboBox()
+        self.tau_type_combo.addItems(['exp', 'linear'])
+        self.tau_type_combo.setCurrentText('exp')
+
         params_config = {
             'runs': {
                 'display_text': 'Runs (per pt.): ',
@@ -94,10 +106,10 @@ class T1Widget(ExperimentWidget):
             },
             'tau_type': {
                 'display_text': '\u03C4s\' type',
-                'widget': QtWidgets.QLineEdit("exp"),
+                'widget': self.tau_type_combo,
             },
 
-            'xy': {
+            'pi_xy': {
                 'display_text': 'x or y',
                 'widget': QtWidgets.QLineEdit("x"),
             },
@@ -120,15 +132,23 @@ class T1Widget(ExperimentWidget):
                 ),
             },
 
-            'pihalf_y': {
-                'display_text': '\u03C0/2_y: ',
-                'widget': SpinBox(
-                    suffix='s',
-                    siPrefix=True,
-                    bounds=(1e-9, None),
-                ),
-            },
+            #'pihalf_y': {
+            #    'display_text': '\u03C0/2_y: ',
+            #    'widget': SpinBox(
+            #        suffix='s',
+            #        siPrefix=True,
+            #        bounds=(1e-9, None),
+            #    ),
+            #},
 
+            #'pihalf_y': {
+            #    'display_text': '\u03C0/2_y: ',
+            #    'widget': SpinBox(
+            #        suffix='s',
+            #        siPrefix=True,
+            #        bounds=(1e-9, None),
+            #    ),
+            #},
 
             'init_time': {
                 'display_text': 'Init. Time: ',
@@ -143,7 +163,7 @@ class T1Widget(ExperimentWidget):
             'read_time': {
                 'display_text': 'Readout Time: ',
                 'widget': SpinBox(
-                    value=400e-9,
+                    value=300e-9,
                     suffix='s',
                     siPrefix=True,
                     bounds=(5e-9, None),
@@ -151,34 +171,19 @@ class T1Widget(ExperimentWidget):
             },
             
             'las_to_pulse': {
-                'display_text': 'Seq. Gap: ',
+                'display_text': 'Las-MW Gap: ',
                 'widget': SpinBox(
-                    value=0,
+                    value=100e-9,
                     suffix='s',
                     siPrefix=True,
                     bounds=(0, None),
                 ),
             },
 
-            'seq_gap': {
-                'display_text': 'Seq. Gap: ',
-                'widget': SpinBox(
-                    value=0,
-                    suffix='s',
-                    siPrefix=True,
-                    bounds=(0, None),
-                ),
+            'T1 type': {
+                'display_text': 'T1 type',
+                'widget': self.t1_type_combo,
             },
-
-            'seq': {
-                'display_text': 'sequence',
-                'widget': QtWidgets.QLineEdit("Optical T1 General"),
-            },
-            'T1_sg': {
-                'display_text': 'Which SG?',
-                'widget': QtWidgets.QLineEdit("SRS"),
-            },
-
         }
 
         super().__init__(params_config,
@@ -194,18 +199,71 @@ def process_T1_data(sink: DataSink):
     contrast_sweeps = []
     # print('\n datasets[ms1] now', sink.datasets['ms1'])
     # print('\n datasets[background] now', sink.datasets['background'])
-    for s, _ in enumerate(sink.datasets['ms1']):
-        x_axis_data = sink.datasets['ms1'][s][0]
-        ms1 = sink.datasets['ms1'][s][1]
-        ms0 = sink.datasets['ms0'][s][1]
-        diff_sweeps.append(np.stack([x_axis_data, ms0 - ms1]))
+    for s, _ in enumerate(sink.datasets['signal']):
+        x_axis_data = sink.datasets['signal'][s][0] # tau times
+        sig = sink.datasets['signal'][s][1] # ms1
+        bg = sink.datasets['background'][s][1] # ms0
+        diff_sweeps.append(np.stack([x_axis_data, bg - sig]))
         contrast_sweeps.append(
-            np.stack([x_axis_data, (ms0 - ms1)/(ms0 + ms1)]))
+            np.stack([x_axis_data, (bg - sig)/(bg + sig)]))
         # div_sweeps.append(np.stack([mw_times, sig/bg]))
     # print(ms1)
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['contrast'] = contrast_sweeps
 
+    if sink.datasets['signal'] and sink.datasets['background']:
+        x_axis_data = sink.datasets['signal'][0][0] # tau times
+
+        sig_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['signal']]),
+            axis=0
+        )
+        bg_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['background']]),
+            axis=0
+        )
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            contrast_from_avg = np.where(
+                (bg_mean + sig_mean) != 0,
+                (bg_mean - sig_mean) / (bg_mean + sig_mean),
+                np.nan
+            )
+
+        sink.datasets['contrast_from_avg'] = [
+            np.stack([x_axis_data, contrast_from_avg])
+        ]
+
+    for source_name, output_name in [
+        ('signal', 'sig_t1_norm_from_avg'),
+        ('background', 'bg_t1_norm_from_avg'),
+    ]:
+        if source_name in sink.datasets and sink.datasets[source_name]:
+            x_axis_data = sink.datasets[source_name][0][0]
+
+            I_t = np.nanmean(
+                np.array([x[1] for x in sink.datasets[source_name]]),
+                axis=0
+            )
+
+            valid = np.isfinite(I_t)
+
+            if np.count_nonzero(valid) >= 2:
+                I_valid = I_t[valid]
+                I_0 = I_valid[0]
+                n_tail = min(5, I_valid.size)
+                I_inf = np.nanmean(I_valid[-n_tail:])
+
+                denom = I_0 - I_inf
+
+                if np.isfinite(denom) and denom != 0:
+                    norm = (I_t - I_inf) / denom
+                else:
+                    norm = np.full_like(I_t, np.nan, dtype=float)
+
+                sink.datasets[output_name] = [
+                    np.stack([x_axis_data, norm])
+                ]
 
 class FlexLinePlotWidgetWithT1(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""
@@ -213,20 +271,52 @@ class FlexLinePlotWidgetWithT1(FlexLinePlotWidget):
     def __init__(self):
         super().__init__(data_processing_func=process_T1_data)
         # create some default average plots
-        self.add_plot('ms1_avg',        series='ms1',   scan_i='',
+        self.add_plot('sig_avg',        series='signal',   scan_i='',
                       scan_j='',  processing='Average')
-        self.add_plot('ms0_avg',         series='ms0',
+        self.hide_plot('sig_avg')
+
+        self.add_plot('bg_avg',         series='background',
                       scan_i='',     scan_j='',  processing='Average')
-        self.hide_plot('ms0_avg')
+        self.hide_plot('bg_avg')
+
         self.add_plot('contrast_avg',       series='contrast',
                       scan_i='',      scan_j='',  processing='Average')
         self.hide_plot('contrast_avg')
+
         self.add_plot('diff_avg',       series='diff',  scan_i='',
                       scan_j='',  processing='Average')
         self.hide_plot('diff_avg')
 
+        self.add_plot(
+            'contrast_from_avg',
+            series='contrast_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('contrast_from_avg')
+
+        self.add_plot(
+            'ms1_t1_norm_from_avg',
+            series='ms1_t1_norm_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('ms1_t1_norm_from_avg')
+
+        self.add_plot(
+            'ms0_t1_norm_from_avg',
+            series='ms0_t1_norm_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('ms0_t1_norm_from_avg')
+
+
         # create some plots that not frequently used, so we hide them
-        self.add_plot('ms1_latest',     series='ms1',
+        """ self.add_plot('ms1_latest',     series='ms1',
                       scan_i='-1',   scan_j='',  processing='Average')
         self.add_plot('ms1_first',      series='ms1',
                       scan_i='0',    scan_j='1', processing='Average')
@@ -246,7 +336,7 @@ class FlexLinePlotWidgetWithT1(FlexLinePlotWidget):
 
         self.add_plot('contrast_latest',    series='contrast',
                       scan_i='-1',    scan_j='',  processing='Average')
-        self.hide_plot('contrast_latest')
+        self.hide_plot('contrast_latest') """
         # manually set the XY range
         # self.line_plot.plot_item().setXRange(3.0, 4.0)
         # self.line_plot.plot_item().setYRange(-3000, 4500)

@@ -47,6 +47,7 @@ def main():
     import template.gui.gui_ODMR
     import template.gui.gui_Rabi
     import template.gui.gui_T1
+    import template.gui.gui_T2
     import template.gui.gui_Calibrate
 
     nspyre_init_logger(
@@ -115,6 +116,18 @@ def main():
                     stretch=(1, 1),
                 ),
 
+                "T1": MainWidgetItem(
+                    template.gui.gui_T1,
+                    "T1Widget",
+                    stretch=(1, 1),
+                ),
+
+                "T2": MainWidgetItem(
+                    template.gui.gui_T2,
+                    "T2Widget",
+                    stretch=(1, 1),
+                ),
+
                 "ODMR": MainWidgetItem(
                     template.gui.gui_ODMR,
                     "ODMR_Widget",
@@ -170,6 +183,11 @@ def main():
                     "T1Plot": MainWidgetItem(
                         template.gui.gui_T1,
                         "FlexLinePlotWidgetWithT1",
+                        stretch=(100, 100),
+                    ),
+                    "T2Plot": MainWidgetItem(
+                        template.gui.gui_T2,
+                        "FlexLinePlotWidgetWithT2",
                         stretch=(100, 100),
                     ),
                 },

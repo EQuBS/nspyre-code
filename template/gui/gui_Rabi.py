@@ -211,6 +211,54 @@ def process_Rabi_data(sink: DataSink):
     sink.datasets['contrast'] = contrast_sweeps
     sink.datasets['normalized_diff'] = normalized_diff_sweeps
 
+    if sink.datasets['signal'] and sink.datasets['background']:
+        mw_times = sink.datasets['signal'][0][0]
+
+        sig_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['signal']]),
+            axis=0
+        )
+        bg_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['background']]),
+            axis=0
+        )
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            contrast_from_avg = np.where(
+                (bg_mean + sig_mean) != 0,
+                (bg_mean - sig_mean) / (bg_mean + sig_mean),
+                np.nan
+            )
+
+            normalized_diff_from_avg = np.where(
+                bg_mean != 0,
+                (sig_mean - bg_mean) / bg_mean,
+                np.nan
+            )
+
+        sink.datasets['contrast_from_avg'] = [
+            np.stack([mw_times, contrast_from_avg])
+        ]
+
+        sink.datasets['normalized_diff_from_avg'] = [
+            np.stack([mw_times, normalized_diff_from_avg])
+        ]
+
+        # Min-max PL normalization:
+        # C(tau) = (I(tau) - I_min) / (I_max - I_min)
+        I_tau = sig_mean
+        I_min = np.nanmin(I_tau)
+        I_max = np.nanmax(I_tau)
+
+        if np.isfinite(I_min) and np.isfinite(I_max) and I_max != I_min:
+            pl_minmax_norm = (I_tau - I_min) / (I_max - I_min)
+        else:
+            pl_minmax_norm = np.full_like(I_tau, np.nan, dtype=float)
+
+        sink.datasets['pl_minmax_norm_from_avg'] = [
+            np.stack([mw_times, pl_minmax_norm])
+        ]
+
     # Fit the averaged Rabi contrast trace
     sink.datasets['rabi_fit'] = []
     if contrast_sweeps:
@@ -226,33 +274,57 @@ class FlexLinePlotWidgetWithRabi(FlexLinePlotWidget):
         # create some default average plots
         self.add_plot('sig_avg',        series='signal',   scan_i='',     scan_j='',  processing='Average')
         self.add_plot('bg_avg',         series='background',   scan_i='',     scan_j='',  processing='Average')
-        self.add_plot('contrast_avg',       series='contrast',  scan_i='',      scan_j='',  processing='Average')
-        self.hide_plot('contrast_avg')
+        #self.add_plot('contrast_avg',       series='contrast',  scan_i='',      scan_j='',  processing='Average')
+        #self.hide_plot('contrast_avg')
         self.add_plot('diff_avg',       series='diff',  scan_i='',      scan_j='',  processing='Average')
         self.hide_plot('diff_avg')
-        self.add_plot('normalized_diff_avg', series='normalized_diff', scan_i='', scan_j='', processing='Average')
-        self.hide_plot('normalized_diff_avg')
+        #self.add_plot('normalized_diff_avg', series='normalized_diff', scan_i='', scan_j='', processing='Average')
+        #self.hide_plot('normalized_diff_avg')
 
         self.add_plot('rabi_fit', series='rabi_fit', scan_i='', scan_j='', processing='Average') # Added by Rolando A. Fimbres G. 3/30/2026
         self.hide_plot('rabi_fit')
 
+        self.add_plot(
+            'contrast_from_avg',
+            series='contrast_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('contrast_from_avg')
+
+        self.add_plot(
+            'normalized_diff_from_avg',
+            series='normalized_diff_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('normalized_diff_from_avg')
+
+        self.add_plot(
+            'pl_minmax_norm_from_avg',
+            series='pl_minmax_norm_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('pl_minmax_norm_from_avg')
+
 
         # create some plots that not frequently used, so we hide them
-        self.add_plot('sig_latest',     series='signal',   scan_i='-1',   scan_j='',  processing='Average')
-        self.add_plot('sig_first',      series='signal',   scan_i='0',    scan_j='1', processing='Average')
-        self.add_plot('sig_latest_10',  series='signal',   scan_i='-10',  scan_j='',  processing='Average')
-        self.hide_plot('sig_latest')
-        self.hide_plot('sig_first')
-        self.hide_plot('sig_latest_10')
-
-        self.add_plot('bg_latest',      series='background',   scan_i='-1',   scan_j='',  processing='Average')
-        self.hide_plot('bg_latest')
-        
-        self.add_plot('diff_latest',    series='diff',  scan_i='-1',    scan_j='',  processing='Average')
-        self.hide_plot('diff_latest')
-        
-        self.add_plot('contrast_latest',    series='contrast',  scan_i='-1',    scan_j='',  processing='Average')
-        self.hide_plot('contrast_latest')
+        #self.add_plot('sig_latest',     series='signal',   scan_i='-1',   scan_j='',  processing='Average')
+        #self.add_plot('sig_first',      series='signal',   scan_i='0',    scan_j='1', processing='Average')
+        #self.add_plot('sig_latest_10',  series='signal',   scan_i='-10',  scan_j='',  processing='Average')
+        #self.hide_plot('sig_latest')
+        #self.hide_plot('sig_first')
+        #self.hide_plot('sig_latest_10')
+        #self.add_plot('bg_latest',      series='background',   scan_i='-1',   scan_j='',  processing='Average')
+        #self.hide_plot('bg_latest')
+        #self.add_plot('diff_latest',    series='diff',  scan_i='-1',    scan_j='',  processing='Average')
+        #self.hide_plot('diff_latest')
+        #self.add_plot('contrast_latest',    series='contrast',  scan_i='-1',    scan_j='',  processing='Average')
+        #self.hide_plot('contrast_latest')
         # manually set the XY range
         #self.line_plot.plot_item().setXRange(3.0, 4.0)
         #self.line_plot.plot_item().setYRange(-3000, 4500)

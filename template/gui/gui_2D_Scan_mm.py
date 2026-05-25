@@ -143,6 +143,10 @@ class TwoD_Scan_mm(ExperimentWidget):
                 "display_text": "Dwell / WFMA Step (ms)",
                 "widget": SpinBox(value=5.0, siPrefix=False, bounds=(0.05, 10000.0), step=0.1, dec=3, int=False),
             },
+            "Average_Per_Pixel": {
+                "display_text": "Average per pixel",
+                "widget": SpinBox(value=1, int=True, bounds=(1, 100000), dec=True),
+            },
             "Bidirectional": {
                 "display_text": "Bidirectional Raster",
                 "widget": bidirectional,
