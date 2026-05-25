@@ -92,9 +92,20 @@ class T2Widget(ExperimentWidget):
                     dec = True,
                 ),
             },
+
             'tau_type': {
                 'display_text': '\u03C4s\' type',
                 'widget': self.tau_type_combo,
+            },
+
+            'laser_power': {
+                'display_text': 'Laser Power [%]',
+                'widget': SpinBox(
+                    value=5,
+                    int=True,
+                    bounds=(0, 100),
+                    dec=True,
+                ),
             },
 
             'half_pi': {
@@ -215,7 +226,7 @@ class T2Widget(ExperimentWidget):
         super().__init__(params_config, 
                         sm,
                         'SpinMeasurements',
-                        'T2_run',
+                        'T2_run_R',
                         title='T2')
 
 
@@ -227,30 +238,153 @@ def process_T2_data(sink: DataSink):
     contrast_sweeps = []
     #print('\n datasets[signal] now', sink.datasets['signal'])
     #print('\n datasets[background] now', sink.datasets['background'])
-    for s,_ in enumerate(sink.datasets['ms1']):
-        x_axis_data = sink.datasets['ms1'][s][0]
-        ms1 = sink.datasets['ms1'][s][1]
-        ms0 = sink.datasets['ms0'][s][1]
+    for s,_ in enumerate(sink.datasets['signal']):
+        x_axis_data = sink.datasets['signal'][s][0]
+        ms1 = sink.datasets['signal'][s][1]
+        ms0 = sink.datasets['background'][s][1]
         diff_sweeps.append(np.stack([x_axis_data, ms0 - ms1]))
         contrast_sweeps.append(np.stack([x_axis_data, (ms0 - ms1)/(ms0 + ms1)]))
         #div_sweeps.append(np.stack([mw_times, sig/bg]))
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['contrast'] = contrast_sweeps
 
+    if sink.datasets['signal'] and sink.datasets['background']:
+        x_axis_data = sink.datasets['signal'][0][0]
+
+        ms1_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['signal']]),
+            axis=0
+        )
+        ms0_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['background']]),
+            axis=0
+        )
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            contrast_from_avg = np.where(
+                (ms0_mean + ms1_mean) != 0,
+                (ms0_mean - ms1_mean) / (ms0_mean + ms1_mean),
+                np.nan
+            )
+
+        sink.datasets['contrast_from_avg'] = [
+            np.stack([x_axis_data, contrast_from_avg])
+        ]
+
+    if sink.datasets['signal'] and sink.datasets['background']:
+        x_axis_data = sink.datasets['signal'][0][0]
+
+        ms1_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['signal']]),
+            axis=0
+        )
+        ms0_mean = np.nanmean(
+            np.array([x[1] for x in sink.datasets['background']]),
+            axis=0
+        )
+
+        # Ramsey normalization:
+        # C(tau) = (I(tau) - I_mid) / A
+        # I_mid = (I_max + I_min)/2
+        # A = (I_max - I_min)/2
+        I_tau = ms1_mean
+
+        I_max = np.nanpercentile(I_tau, 95)
+        I_min = np.nanpercentile(I_tau, 5)
+
+        I_mid = 0.5 * (I_max + I_min)
+        A = 0.5 * (I_max - I_min)
+
+        if np.isfinite(A) and A != 0:
+            ramsey_fringe_norm_from_avg = (I_tau - I_mid) / A
+        else:
+            ramsey_fringe_norm_from_avg = np.full_like(I_tau, np.nan, dtype=float)
+
+        sink.datasets['ramsey_fringe_norm_from_avg'] = [
+            np.stack([x_axis_data, ramsey_fringe_norm_from_avg])
+        ]
+
+        # Spin Echo normalization:
+        # C(tau) = (I(tau) - I_dark) / (I_bright - I_dark)
+        I_dark = np.nanpercentile(ms1_mean, 5)
+        I_bright = np.nanpercentile(ms0_mean, 95)
+
+        denom = I_bright - I_dark
+
+        if np.isfinite(denom) and denom != 0:
+            spin_echo_bright_dark_norm_from_avg = (I_tau - I_dark) / denom
+        else:
+            spin_echo_bright_dark_norm_from_avg = np.full_like(I_tau, np.nan, dtype=float)
+
+        sink.datasets['spin_echo_bright_dark_norm_from_avg'] = [
+            np.stack([x_axis_data, spin_echo_bright_dark_norm_from_avg])
+        ]
+
+        # Optional pointwise Spin Echo normalization if ms0 is a tau-dependent bright reference
+        with np.errstate(divide='ignore', invalid='ignore'):
+            spin_echo_pointwise_norm_from_avg = np.where(
+                (ms0_mean - I_dark) != 0,
+                (I_tau - I_dark) / (ms0_mean - I_dark),
+                np.nan
+            )
+
+        sink.datasets['spin_echo_pointwise_norm_from_avg'] = [
+            np.stack([x_axis_data, spin_echo_pointwise_norm_from_avg])
+        ]
+
 class FlexLinePlotWidgetWithT2(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""
     def __init__(self):
         super().__init__(data_processing_func=process_T2_data)
         # create some default average plots
-        self.add_plot('ms1_avg',        series='ms1',   scan_i='',     scan_j='',  processing='Average')
-        self.add_plot('ms0_avg',         series='ms0',   scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('sig_avg',        series='signal',   scan_i='',     scan_j='',  processing='Average')
+        self.add_plot('bg_avg',         series='background',   scan_i='',     scan_j='',  processing='Average')
         self.add_plot('contrast_avg',       series='contrast',  scan_i='',      scan_j='',  processing='Average')
         self.hide_plot('contrast_avg')
         self.add_plot('diff_avg',       series='diff',  scan_i='',      scan_j='',  processing='Average')
         self.hide_plot('diff_avg')
 
+        # (Rolando A. Fimbres G. 2026-5-25) contrast from average, ramsey fringe norm from average, and spin echo norm from average 
+        self.add_plot(
+            'contrast_from_avg',
+            series='contrast_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('contrast_from_avg')
+
+        self.add_plot(
+            'ramsey_fringe_norm_from_avg',
+            series='ramsey_fringe_norm_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('ramsey_fringe_norm_from_avg')
+
+        self.add_plot(
+            'spin_echo_bright_dark_norm_from_avg',
+            series='spin_echo_bright_dark_norm_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('spin_echo_bright_dark_norm_from_avg')
+
+        self.add_plot(
+            'spin_echo_pointwise_norm_from_avg',
+            series='spin_echo_pointwise_norm_from_avg',
+            scan_i='',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('spin_echo_pointwise_norm_from_avg')
+        ####################################################################
+
+
         # create some plots that not frequently used, so we hide them
-        self.add_plot('ms1_latest',     series='ms1',   scan_i='-1',   scan_j='',  processing='Average')
+        """ self.add_plot('ms1_latest',     series='ms1',   scan_i='-1',   scan_j='',  processing='Average')
         self.add_plot('ms1_first',      series='ms1',   scan_i='0',    scan_j='1', processing='Average')
         self.add_plot('ms1_latest_10',  series='ms1',   scan_i='-10',  scan_j='',  processing='Average')
         self.hide_plot('ms1_latest')
@@ -264,7 +398,7 @@ class FlexLinePlotWidgetWithT2(FlexLinePlotWidget):
         self.hide_plot('diff_latest')
         
         self.add_plot('contrast_latest',    series='contrast',  scan_i='-1',    scan_j='',  processing='Average')
-        self.hide_plot('contrast_latest')
+        self.hide_plot('contrast_latest') """
         # manually set the XY range
         #self.line_plot.plot_item().setXRange(3.0, 4.0)
         #self.line_plot.plot_item().setYRange(-3000, 4500)

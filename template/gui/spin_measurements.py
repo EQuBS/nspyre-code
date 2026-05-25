@@ -4539,7 +4539,7 @@ class SpinMeasurements:
 
             signal_sweeps = StreamingList()
             background_sweeps = StreamingList()
-            norm_sweeps = StreamingList()
+            #norm_sweeps = StreamingList()
 
             # Set Pulse Streamer sequence
             # Sequence selection:
@@ -4565,7 +4565,7 @@ class SpinMeasurements:
             gw.laser.on()
 
             """ Set MW Parameters """
-            gw.sg.set_rf_amplitude(kwargs['mw_power'])
+            gw.sg.set_rf_amplitude(kwargs['rf_power'])
             gw.sg.set_mod_type(6)       # IQ
             gw.sg.set_qmod_function(5)  # external
             gw.sg.set_mod_toggle(1)
@@ -4592,8 +4592,8 @@ class SpinMeasurements:
                 return 1e12 * np.sum(counts_slice) / np.sum(widths_slice)
             
             # Sequence execution and data acquisition
-            for iter in range(kwargs['iterations']):
-                print(f"Iteration {iter + 1} of {kwargs['iterations']}")
+            for iter in range(kwargs['iters']):
+                print(f"Iteration {iter + 1} of {kwargs['iters']}")
 
                 # RAW sweeps for this iteration only
                 #sig = np.full(kwargs['num_points'], np.nan, dtype=float)
@@ -4615,10 +4615,31 @@ class SpinMeasurements:
                 while not gw.daq.cbm_ready():
                     time.sleep(0.001)
 
-                counts, binwidths = _read_cbm(expected_bins, 'CW ODMR')
+                #counts, binwidths = _read_cbm(expected_bins, 'CW ODMR')
 
-                sig = _rate_cps(counts[0::2], binwidths[0::2])
-                bg = _rate_cps(counts[1::2], binwidths[1::2])
+                #sig = _rate_cps(counts[0::2], binwidths[0::2])
+                #bg = _rate_cps(counts[1::2], binwidths[1::2])
+
+                
+                counts, binwidths = _read_cbm(expected_bins, 'T2')
+
+                sig_counts = counts[0::2].reshape(kwargs['runs'], num_tau) # ms1
+                bg_counts = counts[1::2].reshape(kwargs['runs'], num_tau) # ms0
+
+                sig_widths = binwidths[0::2].reshape(kwargs['runs'], num_tau)
+                bg_widths = binwidths[1::2].reshape(kwargs['runs'], num_tau)
+
+                sig = 1e12 * sig_counts.sum(axis=0) / sig_widths.sum(axis=0)
+                bg = 1e12 * bg_counts.sum(axis=0) / bg_widths.sum(axis=0)
+
+                # Remove the 1 ns warm-up point
+                sig = np.delete(sig, 0)
+                bg = np.delete(bg, 0)
+
+                # Sort back to physical tau order
+                sig = np.array([sig[i] for i in index_order])
+                bg = np.array([bg[i] for i in index_order])
+                
 
                 if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
                     gw.sg.set_rf_toggle(0)
@@ -4631,16 +4652,16 @@ class SpinMeasurements:
                     print('the GUI has asked us nicely to exit')
                     return
                 
-                with np.errstate(divide='ignore', invalid='ignore'):
-                    norm = np.where(bg != 0, sig / bg, np.nan)
+                #with np.errstate(divide='ignore', invalid='ignore'):
+                #    norm = np.where(bg != 0, sig / bg, np.nan)
                 # Append RAW sweeps, not cumulative averages
                 signal_sweeps.append(np.stack([tau_times / 1e3, sig]))
                 background_sweeps.append(np.stack([tau_times / 1e3, bg]))
-                norm_sweeps.append(np.stack([tau_times / 1e3, norm]))
+                #norm_sweeps.append(np.stack([tau_times / 1e3, norm]))
                 # Streaming list update and push to data server
                 signal_sweeps.updated_item(-1)
                 background_sweeps.updated_item(-1)
-                norm_sweeps.updated_item(-1)
+                #norm_sweeps.updated_item(-1)
 
                 t2_data.push({
                     'params': {
@@ -4648,6 +4669,7 @@ class SpinMeasurements:
                         'stop': kwargs['stop'],
                         'num_points': kwargs['num_pts'],
                         'iterations': kwargs['iters'],
+                        'runs': kwargs['runs'],
                     },
                     'title': title,
                     'xlabel': 'τ (µs)',
@@ -4655,7 +4677,7 @@ class SpinMeasurements:
                     'datasets': {
                         'signal': signal_sweeps,
                         'background': background_sweeps,
-                        'norm': norm_sweeps,
+                         #'norm': norm_sweeps,
 
                     },
                 })
