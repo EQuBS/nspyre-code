@@ -86,6 +86,9 @@ class tt20:
         counts = self.counter.getData()
         return counts
     
+    def get_c_data(self):
+        return self.counter.getData()
+    
     #returns the total counts since initalization
     def get_total_counter_counts(self):
         return self.counter.getDataTotalCounts()
@@ -199,6 +202,53 @@ class tt20:
         :rtype: bool
         """
         return self.Time_Differences.ready()
+
+    # Rolando 6/1/2026
+    # Introducing the "Histogram" method from "Time histograms" Section of measurements.
+    def Histogram(self, click_channel, start_channel, bin_width, n_bins, tagger=None):
+        """
+        Docstring for Histogram
+
+        :param self: Description from Swabian's Time Tagger API
+        :param click_channel: Channel on which stop clicks are received.
+        :param start_channel: Channel that sets start times relative to 
+                              which clicks on the click channel are measured.
+        :param bin_width: Binwidth in picoseconds.
+        :param n_bins: Number of bins in each histogram.
+        :param tagger: Time tagger object instance.
+        :return: Description
+        :rtype: Any
+
+        """
+        if tagger is None:
+            tagger = self.tagger
+        self.th_Histogram = tt.Histogram(tagger, click_channel, start_channel, bin_width, n_bins)
+
+    def H_getData(self):
+        """
+        Docstring for H_getData
+
+        :param self: Description
+        :return: A one-dimensional array of size n_bins 
+                containing the histograms.
+        :rtype: Any
+        """
+        data = self.th_Histogram.getData()
+        return obtain(data)
+    
+    def H_getIndex(self):
+        """
+        Docstring for H_getIndex
+
+        :param self: Description
+        :return: A vector of size n_bins containing the time bins in ps.
+        :rtype: Any
+        """
+        index = self.th_Histogram.getIndex()
+        return obtain(index)
+    
+    def H_clear(self):
+        self.th_Histogram.clear()
 
     #initalizes correlation measurement
     # - channels: list of channels to measure

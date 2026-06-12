@@ -27,12 +27,16 @@ class T1Widget(ExperimentWidget):
     def __init__(self):
 
         self.t1_type_combo = QtWidgets.QComboBox()
-        self.t1_type_combo.addItems(['Optical T1', 'T1'])
+        self.t1_type_combo.addItems(['Optical T1', 'T1', 'Opt. 2', 'Opt. 3'])
         self.t1_type_combo.setCurrentText('Optical T1')
 
         self.tau_type_combo = QtWidgets.QComboBox()
         self.tau_type_combo.addItems(['exp', 'linear'])
         self.tau_type_combo.setCurrentText('exp')
+
+        self.pi_type_combo = QtWidgets.QComboBox()
+        self.pi_type_combo.addItems(['x', 'y'])
+        self.pi_type_combo.setCurrentText('x')
 
         params_config = {
             'runs': {
@@ -47,7 +51,7 @@ class T1Widget(ExperimentWidget):
             'iters': {
                 'display_text': 'Exp. Iterations: ',
                 'widget': SpinBox(
-                    value=500,
+                    value=10,
                     int=True,
                     bounds=(1, None),
                 ),
@@ -104,6 +108,17 @@ class T1Widget(ExperimentWidget):
                     dec=True,
                 ),
             },
+
+            'laser_power': {
+                'display_text': 'Laser Power [%]',
+                'widget': SpinBox(
+                    value=5,
+                    int=True,
+                    bounds=(0, 100),
+                    dec=True,
+                ),
+            },
+
             'tau_type': {
                 'display_text': '\u03C4s\' type',
                 'widget': self.tau_type_combo,
@@ -111,44 +126,30 @@ class T1Widget(ExperimentWidget):
 
             'pi_xy': {
                 'display_text': 'x or y',
-                'widget': QtWidgets.QLineEdit("x"),
+                'widget': self.pi_type_combo,
             },
 
             'pi_x': {
-                'display_text': '\u03C0_x: ',
+                'display_text': 'π_x: ',
                 'widget': SpinBox(
+                    value=100e-9,
                     suffix='s',
                     siPrefix=True,
                     bounds=(1e-9, None),
+                    dec=True,
                 ),
             },
 
             'pi_y': {
-                'display_text': '\u03C0_y: ',
+                'display_text': 'π_y: ',
                 'widget': SpinBox(
+                    value=100e-9,
                     suffix='s',
                     siPrefix=True,
                     bounds=(1e-9, None),
+                    dec=True,
                 ),
             },
-
-            #'pihalf_y': {
-            #    'display_text': '\u03C0/2_y: ',
-            #    'widget': SpinBox(
-            #        suffix='s',
-            #        siPrefix=True,
-            #        bounds=(1e-9, None),
-            #    ),
-            #},
-
-            #'pihalf_y': {
-            #    'display_text': '\u03C0/2_y: ',
-            #    'widget': SpinBox(
-            #        suffix='s',
-            #        siPrefix=True,
-            #        bounds=(1e-9, None),
-            #    ),
-            #},
 
             'init_time': {
                 'display_text': 'Init. Time: ',
@@ -180,6 +181,17 @@ class T1Widget(ExperimentWidget):
                 ),
             },
 
+            'seq_gap': {
+                'display_text': 'Seq. Gap: ',
+                'widget': SpinBox(
+                    value=1e-6,
+                    suffix='s',
+                    siPrefix=True,
+                    bounds=(100e-9, None),
+                    dec=True,
+                ),
+            },
+
             'T1 type': {
                 'display_text': 'T1 type',
                 'widget': self.t1_type_combo,
@@ -197,6 +209,8 @@ def process_T1_data(sink: DataSink):
     """Subtract the signal from background trace and add it as a new 'diff' dataset."""
     diff_sweeps = []
     contrast_sweeps = []
+    ratio_sweeps = []
+
     # print('\n datasets[ms1] now', sink.datasets['ms1'])
     # print('\n datasets[background] now', sink.datasets['background'])
     for s, _ in enumerate(sink.datasets['signal']):
@@ -206,10 +220,15 @@ def process_T1_data(sink: DataSink):
         diff_sweeps.append(np.stack([x_axis_data, bg - sig]))
         contrast_sweeps.append(
             np.stack([x_axis_data, (bg - sig)/(bg + sig)]))
-        # div_sweeps.append(np.stack([mw_times, sig/bg]))
-    # print(ms1)
+        
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ratio = np.where(bg != 0, sig / bg, np.nan)
+
+        ratio_sweeps.append(np.stack([x_axis_data, ratio]))
+
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['contrast'] = contrast_sweeps
+    sink.datasets['ratio'] = ratio_sweeps
 
     if sink.datasets['signal'] and sink.datasets['background']:
         x_axis_data = sink.datasets['signal'][0][0] # tau times
@@ -296,7 +315,11 @@ class FlexLinePlotWidgetWithT1(FlexLinePlotWidget):
         )
         self.hide_plot('contrast_from_avg')
 
-        self.add_plot(
+        self.add_plot('ratio_avg', series='ratio',
+              scan_i='', scan_j='', processing='Average')
+        self.hide_plot('ratio_avg')
+
+        """ self.add_plot(
             'ms1_t1_norm_from_avg',
             series='ms1_t1_norm_from_avg',
             scan_i='',
@@ -312,7 +335,7 @@ class FlexLinePlotWidgetWithT1(FlexLinePlotWidget):
             scan_j='',
             processing='Average'
         )
-        self.hide_plot('ms0_t1_norm_from_avg')
+        self.hide_plot('ms0_t1_norm_from_avg') """
 
 
         # create some plots that not frequently used, so we hide them

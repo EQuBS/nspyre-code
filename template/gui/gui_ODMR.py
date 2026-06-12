@@ -28,7 +28,7 @@ class ODMR_Widget(ExperimentWidget):
         self.ps = pulse_streamer_driver
 
         self.odmr_type_combo = QtWidgets.QComboBox()
-        self.odmr_type_combo.addItems(['CW', 'CW_list', 'Pulsed', 'Pulsed2', 'P_list', 'P2_list'])
+        self.odmr_type_combo.addItems(['CW', 'CW-Test', 'CW-OnOff', 'CW-SideMod', 'Pulsed', 'Pulsed-Cnst', 'Pulsed2']) #, 'P_list', 'CW_list', 'P2_list'])
         self.odmr_type_combo.setCurrentText('CW')
 
         params_config = {
@@ -78,6 +78,39 @@ class ODMR_Widget(ExperimentWidget):
                     suffix = 's',
                     siPrefix = True,
                     bounds = (10e-9, None),
+                    dec=True,
+                ),
+            },
+            'sideband_mod_freq': {
+                'display_text': 'SideMod IF',
+                'widget': SpinBox(
+                    value = 30e6,
+                    suffix = 'Hz',
+                    siPrefix = True,
+                    bounds = (1, 100e6),
+                    dec=True,
+                ),
+            },
+            'sideband_iq_amplitude': {
+                'display_text': 'SideMod IQ Amp',
+                'widget': SpinBox(
+                    value = 0.45,
+                    suffix = 'V',
+                    siPrefix = False,
+                    bounds = (0, 0.5),
+                    dec=True,
+                ),
+            },
+            'sideband': {
+                'display_text': 'Sideband',
+                'widget': QtWidgets.QLineEdit("upper"),
+            },
+            'sideband_samples_per_period': {
+                'display_text': 'SideMod Samples/Period',
+                'widget': SpinBox(
+                    value = 8,
+                    int = True,
+                    bounds = (4, 128),
                     dec=True,
                 ),
             },
@@ -193,7 +226,7 @@ class ODMR_Widget(ExperimentWidget):
         super().__init__(params_config, 
                         sm,  # No specific measurements class
                         'SpinMeasurements',  # No specific class name
-                        'odmr_run_R2',  # No specific run method
+                        'odmr_run_R3',  # No specific run method
                         title='ODMR')\
 
 """                        
@@ -209,57 +242,29 @@ layout.addWidget(gate_off_button, 0, 2)
 self.setLayout(layout)
 """
 def process_ODMR_data(sink: DataSink):
-    """Subtract the signal from background trace and add it as a new 'diff' dataset."""
-    #diff_sweeps = []
     ratio = []
-    #divnow_sweeps = []
-    norm_sweeps = [] #create normalization plot -A.K 11/19/2025
-    s1 = []
-    s2 = []
-    s3 = []
-    s4 = []
+    contrast_sweeps = []
 
-    for s,_ in enumerate(sink.datasets['signal']):
+    for s, _ in enumerate(sink.datasets['signal']):
         freqs = sink.datasets['signal'][s][0]
-        #sig = sink.datasets['signal_avg'][s][1]
-        #bg = sink.datasets['background_avg'][s][1]
-        sig = sink.datasets['signal'][s][1]
-        bg = sink.datasets['background'][s][1]
+        sig = np.asarray(sink.datasets['signal'][s][1], dtype=float)
+        bg  = np.asarray(sink.datasets['background'][s][1], dtype=float)
 
-        #norm = sink.datasets['norm_avg'][s][1]
-        # To debug code below 2026-5-22 Rolando A. Fimbres G.
-        """ 
-        s1_data = sink.datasets['s1_avg_sweeps']#[s][1] 
-        s2_data = sink.datasets['s2_avg_sweeps']#[s][1]  
-        s3_data = sink.datasets['s3_avg_sweeps']#[s][1]
-        s4_data = sink.datasets['s4_avg_sweeps']#[s][1]
-        
-        s1.append(np.stack([freqs, s1_data]))
-        s2.append(np.stack([freqs, s2_data]))
-        s3.append(np.stack([freqs, s3_data]))
-        s4.append(np.stack([freqs, s4_data])) """
+        bg_safe = bg.copy()
+        bg_safe[bg_safe == 0] = np.nan
 
-        # Avoid division by zero or invalid values
-        # sig[sig == 0] = np.nan
-        bg = bg.astype(float)
-        bg[bg == 0] = np.nan
-
-        #diff_sweeps.append(np.stack([freqs, sig - bg]))
-        ratio.append(np.stack([freqs, sig/bg]))
-        #with np.errstate(divide='ignore', invalid='ignore'):
-        #   norm = np.where(bg != 0, abs(sig-bg)/(bg+sig), np.nan) #Updated by Rolando 3/31/2026 to handle division by zero more gracefully
-            #norm = np.where(bg > 0, sig / bg, np.nan)
-        #norm_sweeps.append(np.stack([freqs, norm]))
-        #divnow_sweeps.append(np.stack([freqs, np.mean(sink.datasets['signal'][:s][1],axis=0)/np.mean(sink.datasets['background'][:s][1],axis=0)]))
         with np.errstate(divide='ignore', invalid='ignore'):
-            norm = np.where(bg != 0, np.abs(sig - bg) / (bg + sig), np.nan)
-        norm_sweeps.append(np.stack([freqs, norm]))
+            ratio_now = sig / bg_safe
+            contrast_now = (bg_safe - sig) / bg_safe
 
-    #sink.datasets['diff'] = diff_sweeps
+        ratio.append(np.stack([freqs, ratio_now]))
+        contrast_sweeps.append(np.stack([freqs, contrast_now]))
+
     sink.datasets['div'] = ratio
-    #sink.datasets['div_now'] = divnow_sweeps
-    sink.datasets['norm_avg'] = norm_sweeps
-    #print("FF")
+    sink.datasets['contrast'] = contrast_sweeps
+
+    # Keep old names as aliases only
+    sink.datasets['norm_avg'] = contrast_sweeps
 
     if sink.datasets['signal'] and sink.datasets['background']:
         freqs = sink.datasets['signal'][0][0]
@@ -274,52 +279,139 @@ def process_ODMR_data(sink: DataSink):
         )
 
         with np.errstate(divide='ignore', invalid='ignore'):
-            norm_from_avg = np.where(
-                (sig_mean + bg_mean) != 0,
-                np.abs(sig_mean - bg_mean) / (sig_mean + bg_mean),
+            contrast_from_avg = np.where(
+                bg_mean != 0,
+                (bg_mean - sig_mean) / bg_mean,
                 np.nan
             )
 
-        sink.datasets['norm_from_avg'] = [
-            np.stack([freqs, norm_from_avg])
+        sink.datasets['contrast_from_avg'] = [
+            np.stack([freqs, contrast_from_avg])
         ]
 
-    # Fit the averaged normalized ODMR trace. Added by Rolando A. Fimbres G. 3/30/2026
-    """sink.datasets['odmr_fit'] = []
-    if norm_sweeps:
-        x_avg, y_avg = average_trace(norm_sweeps)
-        fit_res = fit_odmr_trace(x_avg, y_avg, n_dips=2)
-        if fit_res is not None:
-            sink.datasets['odmr_fit'] = [fit_res['curve']]
-    """ 
-    # Following line added to ensure the fit is applied after 
-    # a few sweeps have been collected, 
-    # and to attempt a single dip fit if the 2 dip fit fails. Rolando A. Fimbres G. 4/9/2026
+        sink.datasets['norm_from_avg'] = [
+            np.stack([freqs, contrast_from_avg])
+        ]
 
-    if len(sink.datasets['signal']) >= 3 and len(sink.datasets['background']) >= 3:
+    sink.datasets['odmr_fit'] = []
+    # """Subtract the signal from background trace and add it as a new 'diff' dataset."""
+    # ratio = []
+    # norm_sweeps = [] #create normalization plot -A.K 11/19/2025
+    # contrast_sweeps = []
 
-        sink.datasets['odmr_fit'] = []
-        if sink.datasets['signal'] and sink.datasets['background']:
-            x_sig, y_sig = average_trace(sink.datasets['signal'])
-            x_bg, y_bg = average_trace(sink.datasets['background'])
+    # for s,_ in enumerate(sink.datasets['signal']):
+    #     freqs = sink.datasets['signal'][s][0]
+    #     sig = np.asarray(sink.datasets['signal'][s][1], dtype=float)
+    #     bg  = np.asarray(sink.datasets['background'][s][1], dtype=float)
 
-            with np.errstate(divide='ignore', invalid='ignore'):
-                y_norm = np.where(y_bg != 0, y_sig / y_bg, np.nan)
 
-            # Commented to update and NOT force '2 dips' fit. Rolando A. Fimbres G. 4/9/2026
-            """ valid = np.isfinite(y_norm)
-            if np.count_nonzero(valid) > 4:
-                fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=2)
-                if fit_res is not None:
-                    sink.datasets['odmr_fit'] = [fit_res['curve']]  """
-            valid = np.isfinite(y_norm)
-            if np.count_nonzero(valid) > 8:
-                fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=2)
-                if fit_res is None:
-                    fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=1)
+    #     bg_safe = bg.copy()
+    #     bg_safe[bg_safe == 0] = np.nan
 
-                if fit_res is not None:
-                    sink.datasets['odmr_fit'] = [fit_res['curve']]
+    #     with np.errstate(divide='ignore', invalid='ignore'):
+    #         div = sig / bg_safe
+    #         contrast = (bg_safe - sig) / bg_safe
+
+    #     ratio.append(np.stack([freqs, div]))
+    #     contrast_sweeps.append(np.stack([freqs, contrast]))
+
+    #     # Keep old plot name, but make it identical to physical contrast.
+    #     norm_sweeps.append(np.stack([freqs, contrast]))
+
+    # sink.datasets['div'] = ratio
+    # sink.datasets['contrast'] = contrast_sweeps
+    # sink.datasets['norm_avg'] = norm_sweeps
+
+    # if sink.datasets['signal'] and sink.datasets['background']:
+    #     freqs = sink.datasets['signal'][0][0]
+
+    #     sig_mean = np.nanmean(
+    #         np.array([x[1] for x in sink.datasets['signal']]),
+    #         axis=0
+    #     )
+    #     bg_mean = np.nanmean(
+    #         np.array([x[1] for x in sink.datasets['background']]),
+    #         axis=0
+    #     )
+
+    #     # with np.errstate(divide='ignore', invalid='ignore'):
+    #     #     norm_from_avg = np.where(
+    #     #         (sig_mean + bg_mean) != 0,
+    #     #         np.abs(sig_mean - bg_mean) / (sig_mean + bg_mean),
+    #     #         np.nan
+    #     #     )
+
+    #     # sink.datasets['norm_from_avg'] = [
+    #     #     np.stack([freqs, norm_from_avg])
+    #     # ]
+    #     with np.errstate(divide='ignore', invalid='ignore'):
+    #         contrast_from_avg = np.where(
+    #             bg_mean != 0,
+    #             (bg_mean - sig_mean) / bg_mean,
+    #             np.nan
+    #         )
+
+    #     sink.datasets['contrast_from_avg'] = [
+    #         np.stack([freqs, contrast_from_avg])
+    #     ]
+
+    #     # Keep old plotting name if needed
+    #     sink.datasets['norm_from_avg'] = [
+    #         np.stack([freqs, contrast_from_avg])
+    #     ]
+        
+
+    #     with np.errstate(divide='ignore', invalid='ignore'):
+    #         # Contrast calculated after averaging signal and background traces
+    #         norm_from_avg = np.where(
+    #             bg_mean != 0,
+    #             (bg_mean - sig_mean) / bg_mean,
+    #             np.nan
+    #         )
+
+    #     sink.datasets['norm_from_avg'] = [
+    #         np.stack([freqs, norm_from_avg])
+    #     ]
+
+    # # Fit the averaged normalized ODMR trace. Added by Rolando A. Fimbres G. 3/30/2026
+    # """sink.datasets['odmr_fit'] = []
+    # if norm_sweeps:
+    #     x_avg, y_avg = average_trace(norm_sweeps)
+    #     fit_res = fit_odmr_trace(x_avg, y_avg, n_dips=2)
+    #     if fit_res is not None:
+    #         sink.datasets['odmr_fit'] = [fit_res['curve']]
+    # """ 
+    # # Following line added to ensure the fit is applied after 
+    # # a few sweeps have been collected, 
+    # # and to attempt a single dip fit if the 2 dip fit fails. Rolando A. Fimbres G. 4/9/2026
+
+    # if len(sink.datasets['signal']) >= 3 and len(sink.datasets['background']) >= 3:
+
+    #     sink.datasets['odmr_fit'] = []
+    #     if sink.datasets['signal'] and sink.datasets['background']:
+    #         x_sig, y_sig = average_trace(sink.datasets['signal'])
+    #         x_bg, y_bg = average_trace(sink.datasets['background'])
+
+    #         # with np.errstate(divide='ignore', invalid='ignore'):
+    #         #     y_norm = np.where(y_bg != 0, y_sig / y_bg, np.nan)
+    #         with np.errstate(divide='ignore', invalid='ignore'):
+    #             # Fit signed ODMR contrast
+    #             y_norm = np.where(y_bg != 0, (y_bg - y_sig) / y_bg, np.nan)
+
+    #         # Commented to update and NOT force '2 dips' fit. Rolando A. Fimbres G. 4/9/2026
+    #         """ valid = np.isfinite(y_norm)
+    #         if np.count_nonzero(valid) > 4:
+    #             fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=2)
+    #             if fit_res is not None:
+    #                 sink.datasets['odmr_fit'] = [fit_res['curve']]  """
+    #         valid = np.isfinite(y_norm)
+    #         if np.count_nonzero(valid) > 8:
+    #             fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=2)
+    #             if fit_res is None:
+    #                 fit_res = fit_odmr_trace(x_sig[valid], y_norm[valid], n_dips=1)
+
+    #             if fit_res is not None:
+    #                 sink.datasets['odmr_fit'] = [fit_res['curve']]
         
 
 class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
@@ -329,10 +421,15 @@ class FlexLinePlotWidgetWithODMR(FlexLinePlotWidget):
         # create some default average plots
         self.add_plot('sig_avg',        series='signal',   scan_i='',     scan_j='',  processing='Average')
         self.add_plot('bg_avg',         series='background',   scan_i='',     scan_j='',  processing='Average')
-        #self.add_plot('norm_avg',       series='norm_avg',  scan_i='',      scan_j='',  processing='Average') # add normalized plot to main plots -A.K 11/19/2025
+        self.add_plot('norm_avg',       series='norm_avg',  scan_i='',      scan_j='',  processing='Average') # add normalized plot to main plots -A.K 11/19/2025
+        self.hide_plot('norm_avg')
+        self.add_plot('contrast',       series='contrast',  scan_i='',      scan_j='',  processing='Average')
+        self.hide_plot('contrast')
+        self.add_plot('contrast_from_avg', series='contrast_from_avg', scan_i='', scan_j='', processing='Average')
+        self.hide_plot('contrast_from_avg')
 
-        self.add_plot('odmr_fit', series = 'odmr_fit', scan_i='', scan_j='', processing='Average') # Added by Rolando A. Fimbres G. 3/30/2026
-        self.hide_plot('odmr_fit')
+        #self.add_plot('odmr_fit', series = 'odmr_fit', scan_i='', scan_j='', processing='Average') # Added by Rolando A. Fimbres G. 3/30/2026
+        #self.hide_plot('odmr_fit')
 
         """ self.add_plot('s1_avg',        series='s1_avg_sweeps',  scan_i='',     scan_j='',  processing='Average')
         self.add_plot('s2_avg',        series='s2_avg_sweeps',  scan_i='',     scan_j='',  processing='Average')

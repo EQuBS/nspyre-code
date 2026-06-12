@@ -67,7 +67,7 @@ class T2Widget(ExperimentWidget):
                     value = 0.5e-6,
                     suffix = 's',
                     siPrefix = True,
-                    bounds = (0, None),
+                    bounds = (1e-9, None),
                     dec = True,
                 ),
             },
@@ -109,63 +109,65 @@ class T2Widget(ExperimentWidget):
             },
 
             'half_pi': {
-                'display_text': '\u03C0/2: ',
+                'display_text': 'π/2: ',
                 'widget': SpinBox(
+                    value = 24e-9,
                     suffix = 's',
                     siPrefix = True,
-                    bounds = (1e-9, None),
+                    bounds = (8e-9, None),
+                    dec = True,
                 ),
             },
 
-            'pihalf_x': {
-                'display_text': '\u03C0/2_x: ',
-                'widget': SpinBox(
-                    suffix = 's',
-                    siPrefix = True,
-                    bounds = (1e-9, None),
-                ),
-            },
+            # 'pihalf_x': {
+            #     'display_text': '\u03C0/2_x: ',
+            #     'widget': SpinBox(
+            #         suffix = 's',
+            #         siPrefix = True,
+            #         bounds = (1e-9, None),
+            #     ),
+            # },
 
-            'pihalf_y': {
-                'display_text': '\u03C0/2_y: ',
-                'widget': SpinBox(
-                    suffix = 's',
-                    siPrefix = True,
-                    bounds = (1e-9, None),
-                ),
-            },
+            # 'pihalf_y': {
+            #     'display_text': '\u03C0/2_y: ',
+            #     'widget': SpinBox(
+            #         suffix = 's',
+            #         siPrefix = True,
+            #         bounds = (1e-9, None),
+            #     ),
+            # },
 
-            'pi_x': {
-                'display_text': '\u03C0_x: ',
-                'widget': SpinBox(
-                    suffix = 's',
-                    siPrefix = True,
-                    bounds = (1e-9, None),
-                ),
-            },
+            # 'pi_x': {
+            #     'display_text': '\u03C0_x: ',
+            #     'widget': SpinBox(
+            #         suffix = 's',
+            #         siPrefix = True,
+            #         bounds = (1e-9, None),
+            #     ),
+            # },
 
-            'pi_y': {
-                'display_text': '\u03C0_y: ',
-                'widget': SpinBox(
-                    suffix = 's',
-                    siPrefix = True,
-                    bounds = (1e-9, None),
-                ),
-            },
+            # 'pi_y': {
+            #     'display_text': '\u03C0_y: ',
+            #     'widget': SpinBox(
+            #         suffix = 's',
+            #         siPrefix = True,
+            #         bounds = (1e-9, None),
+            #     ),
+            # },
 
-            'pulse_axis': {
-                'display_text': 'Pulse Axis:',
-                'widget': QtWidgets.QLineEdit("Y"),
-            },
+            # 'pulse_axis': {
+            #     'display_text': 'Pulse Axis:',
+            #     'widget': QtWidgets.QLineEdit("Y"),
+            # },
 
-            'n': {
-                'display_text': '# of Seq. (n): ',
-                'widget': SpinBox(
-                    value = 1,
-                    int = True,
-                    bounds=(1, None),
-                ),
-            },
+            # 'n': {
+            #     'display_text': '# of Seq. (n): ',
+            #     'widget': SpinBox(
+            #         value = 1,
+            #         int = True,
+            #         bounds=(1, None),
+            #     ),
+            # },
 
             'init_time': {
                 'display_text': 'Init. Time: ',
@@ -233,104 +235,259 @@ class T2Widget(ExperimentWidget):
 
 
 def process_T2_data(sink: DataSink):
-    """Subtract the signal from background trace and add it as a new 'diff' dataset."""
+
+    """
+    Process T2 data for Ramsey / Spin Echo.
+
+    Expected preferred dataset names from T2_run_R:
+        signal      -> MW/sequence signal trace
+        background  -> reference trace
+
+    Legacy accepted names:
+        ms1
+        ms0
+
+    Creates:
+        diff
+        contrast
+        contrast_from_avg
+        ramsey_fringe_norm_from_avg
+        spin_echo_bright_dark_norm_from_avg
+        spin_echo_pointwise_norm_from_avg
+    """
+
+    # Accept current T2_run_R names and older legacy names.
+    signal_key = 'signal' if 'signal' in sink.datasets else 'ms1'
+    background_key = 'background' if 'background' in sink.datasets else 'ms0'
+
+    if signal_key not in sink.datasets or background_key not in sink.datasets:
+        return
+
+    signal_data = sink.datasets[signal_key]
+    background_data = sink.datasets[background_key]
+
+    if not signal_data or not background_data:
+        return
+
     diff_sweeps = []
     contrast_sweeps = []
-    #print('\n datasets[signal] now', sink.datasets['signal'])
-    #print('\n datasets[background] now', sink.datasets['background'])
-    for s,_ in enumerate(sink.datasets['signal']):
-        x_axis_data = sink.datasets['signal'][s][0]
-        ms1 = sink.datasets['signal'][s][1]
-        ms0 = sink.datasets['background'][s][1]
-        diff_sweeps.append(np.stack([x_axis_data, ms0 - ms1]))
-        contrast_sweeps.append(np.stack([x_axis_data, (ms0 - ms1)/(ms0 + ms1)]))
-        #div_sweeps.append(np.stack([mw_times, sig/bg]))
+
+    n_sweeps = min(len(signal_data), len(background_data))
+
+    for s in range(n_sweeps):
+        x_axis_data = np.asarray(signal_data[s][0], dtype=float)
+        ms1 = np.asarray(signal_data[s][1], dtype=float)
+        ms0 = np.asarray(background_data[s][1], dtype=float)
+
+        # Avoid crashing if a malformed sweep got pushed.
+        n = min(x_axis_data.size, ms1.size, ms0.size)
+        if n == 0:
+            continue
+
+        x_axis_data = x_axis_data[:n]
+        ms1 = ms1[:n]
+        ms0 = ms0[:n]
+
+        diff = ms0 - ms1
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            contrast = np.where(
+                (ms0 + ms1) != 0,
+                (ms0 - ms1) / (ms0 + ms1),
+                np.nan
+            )
+
+        diff_sweeps.append(np.stack([x_axis_data, diff]))
+        contrast_sweeps.append(np.stack([x_axis_data, contrast]))
+
     sink.datasets['diff'] = diff_sweeps
     sink.datasets['contrast'] = contrast_sweeps
 
-    if sink.datasets['signal'] and sink.datasets['background']:
-        x_axis_data = sink.datasets['signal'][0][0]
+    if not diff_sweeps:
+        return
 
-        ms1_mean = np.nanmean(
-            np.array([x[1] for x in sink.datasets['signal']]),
-            axis=0
+    # Build averaged traces safely.
+    x_axis_data = np.asarray(signal_data[0][0], dtype=float)
+
+    signal_stack = []
+    background_stack = []
+
+    for s in range(n_sweeps):
+        x = np.asarray(signal_data[s][0], dtype=float)
+        y_sig = np.asarray(signal_data[s][1], dtype=float)
+        y_bg = np.asarray(background_data[s][1], dtype=float)
+
+        n = min(x_axis_data.size, x.size, y_sig.size, y_bg.size)
+        if n == x_axis_data.size:
+            signal_stack.append(y_sig[:n])
+            background_stack.append(y_bg[:n])
+
+    if not signal_stack or not background_stack:
+        return
+
+    ms1_mean = np.nanmean(np.asarray(signal_stack, dtype=float), axis=0)
+    ms0_mean = np.nanmean(np.asarray(background_stack, dtype=float), axis=0)
+
+    n = min(x_axis_data.size, ms1_mean.size, ms0_mean.size)
+    x_axis_data = x_axis_data[:n]
+    ms1_mean = ms1_mean[:n]
+    ms0_mean = ms0_mean[:n]
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        contrast_from_avg = np.where(
+            (ms0_mean + ms1_mean) != 0,
+            (ms0_mean - ms1_mean) / (ms0_mean + ms1_mean),
+            np.nan
         )
-        ms0_mean = np.nanmean(
-            np.array([x[1] for x in sink.datasets['background']]),
-            axis=0
+
+    sink.datasets['contrast_from_avg'] = [
+        np.stack([x_axis_data, contrast_from_avg])
+    ]
+
+    # Ramsey normalization:
+    # C(tau) = (I(tau) - I_mid) / A
+    I_tau = ms1_mean
+
+    I_max = np.nanpercentile(I_tau, 95)
+    I_min = np.nanpercentile(I_tau, 5)
+
+    I_mid = 0.5 * (I_max + I_min)
+    A = 0.5 * (I_max - I_min)
+
+    if np.isfinite(A) and A != 0:
+        ramsey_fringe_norm_from_avg = (I_tau - I_mid) / A
+    else:
+        ramsey_fringe_norm_from_avg = np.full_like(I_tau, np.nan, dtype=float)
+
+    sink.datasets['ramsey_fringe_norm_from_avg'] = [
+        np.stack([x_axis_data, ramsey_fringe_norm_from_avg])
+    ]
+
+    # Spin Echo normalization:
+    # C(tau) = (I(tau) - I_dark) / (I_bright - I_dark)
+    I_dark = np.nanpercentile(ms1_mean, 5)
+    I_bright = np.nanpercentile(ms0_mean, 95)
+    denom = I_bright - I_dark
+
+    if np.isfinite(denom) and denom != 0:
+        spin_echo_bright_dark_norm_from_avg = (I_tau - I_dark) / denom
+    else:
+        spin_echo_bright_dark_norm_from_avg = np.full_like(I_tau, np.nan, dtype=float)
+
+    sink.datasets['spin_echo_bright_dark_norm_from_avg'] = [
+        np.stack([x_axis_data, spin_echo_bright_dark_norm_from_avg])
+    ]
+
+    # Optional pointwise normalization if background is a tau-dependent reference.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        spin_echo_pointwise_norm_from_avg = np.where(
+            (ms0_mean - I_dark) != 0,
+            (I_tau - I_dark) / (ms0_mean - I_dark),
+            np.nan
         )
 
-        with np.errstate(divide='ignore', invalid='ignore'):
-            contrast_from_avg = np.where(
-                (ms0_mean + ms1_mean) != 0,
-                (ms0_mean - ms1_mean) / (ms0_mean + ms1_mean),
-                np.nan
-            )
+    sink.datasets['spin_echo_pointwise_norm_from_avg'] = [
+        np.stack([x_axis_data, spin_echo_pointwise_norm_from_avg])
+    ]
 
-        sink.datasets['contrast_from_avg'] = [
-            np.stack([x_axis_data, contrast_from_avg])
-        ]
+    # """Subtract the signal from background trace and add it as a new 'diff' dataset."""
+    # diff_sweeps = []
+    # contrast_sweeps = []
+    # #print('\n datasets[signal] now', sink.datasets['signal'])
+    # #print('\n datasets[background] now', sink.datasets['background'])
+    # for s,_ in enumerate(sink.datasets['signal']):
+    #     x_axis_data = sink.datasets['signal'][s][0]
+    #     ms1 = sink.datasets['signal'][s][1]
+    #     ms0 = sink.datasets['background'][s][1]
+    #     diff_sweeps.append(np.stack([x_axis_data, ms0 - ms1]))
+    #     contrast_sweeps.append(np.stack([x_axis_data, (ms0 - ms1)/(ms0 + ms1)]))
+    #     #div_sweeps.append(np.stack([mw_times, sig/bg]))
+    # sink.datasets['diff'] = diff_sweeps
+    # sink.datasets['contrast'] = contrast_sweeps
 
-    if sink.datasets['signal'] and sink.datasets['background']:
-        x_axis_data = sink.datasets['signal'][0][0]
+    # if sink.datasets['signal'] and sink.datasets['background']:
+    #     x_axis_data = sink.datasets['signal'][0][0]
 
-        ms1_mean = np.nanmean(
-            np.array([x[1] for x in sink.datasets['signal']]),
-            axis=0
-        )
-        ms0_mean = np.nanmean(
-            np.array([x[1] for x in sink.datasets['background']]),
-            axis=0
-        )
+    #     ms1_mean = np.nanmean(
+    #         np.array([x[1] for x in sink.datasets['signal']]),
+    #         axis=0
+    #     )
+    #     ms0_mean = np.nanmean(
+    #         np.array([x[1] for x in sink.datasets['background']]),
+    #         axis=0
+    #     )
 
-        # Ramsey normalization:
-        # C(tau) = (I(tau) - I_mid) / A
-        # I_mid = (I_max + I_min)/2
-        # A = (I_max - I_min)/2
-        I_tau = ms1_mean
+    #     with np.errstate(divide='ignore', invalid='ignore'):
+    #         contrast_from_avg = np.where(
+    #             (ms0_mean + ms1_mean) != 0,
+    #             (ms0_mean - ms1_mean) / (ms0_mean + ms1_mean),
+    #             np.nan
+    #         )
 
-        I_max = np.nanpercentile(I_tau, 95)
-        I_min = np.nanpercentile(I_tau, 5)
+    #     sink.datasets['contrast_from_avg'] = [
+    #         np.stack([x_axis_data, contrast_from_avg])
+    #     ]
 
-        I_mid = 0.5 * (I_max + I_min)
-        A = 0.5 * (I_max - I_min)
+    # if sink.datasets['signal'] and sink.datasets['background']:
+    #     x_axis_data = sink.datasets['signal'][0][0]
 
-        if np.isfinite(A) and A != 0:
-            ramsey_fringe_norm_from_avg = (I_tau - I_mid) / A
-        else:
-            ramsey_fringe_norm_from_avg = np.full_like(I_tau, np.nan, dtype=float)
+    #     ms1_mean = np.nanmean(
+    #         np.array([x[1] for x in sink.datasets['signal']]),
+    #         axis=0
+    #     )
+    #     ms0_mean = np.nanmean(
+    #         np.array([x[1] for x in sink.datasets['background']]),
+    #         axis=0
+    #     )
 
-        sink.datasets['ramsey_fringe_norm_from_avg'] = [
-            np.stack([x_axis_data, ramsey_fringe_norm_from_avg])
-        ]
+    #     # Ramsey normalization:
+    #     # C(tau) = (I(tau) - I_mid) / A
+    #     # I_mid = (I_max + I_min)/2
+    #     # A = (I_max - I_min)/2
+    #     I_tau = ms1_mean
 
-        # Spin Echo normalization:
-        # C(tau) = (I(tau) - I_dark) / (I_bright - I_dark)
-        I_dark = np.nanpercentile(ms1_mean, 5)
-        I_bright = np.nanpercentile(ms0_mean, 95)
+    #     I_max = np.nanpercentile(I_tau, 95)
+    #     I_min = np.nanpercentile(I_tau, 5)
 
-        denom = I_bright - I_dark
+    #     I_mid = 0.5 * (I_max + I_min)
+    #     A = 0.5 * (I_max - I_min)
 
-        if np.isfinite(denom) and denom != 0:
-            spin_echo_bright_dark_norm_from_avg = (I_tau - I_dark) / denom
-        else:
-            spin_echo_bright_dark_norm_from_avg = np.full_like(I_tau, np.nan, dtype=float)
+    #     if np.isfinite(A) and A != 0:
+    #         ramsey_fringe_norm_from_avg = (I_tau - I_mid) / A
+    #     else:
+    #         ramsey_fringe_norm_from_avg = np.full_like(I_tau, np.nan, dtype=float)
 
-        sink.datasets['spin_echo_bright_dark_norm_from_avg'] = [
-            np.stack([x_axis_data, spin_echo_bright_dark_norm_from_avg])
-        ]
+    #     sink.datasets['ramsey_fringe_norm_from_avg'] = [
+    #         np.stack([x_axis_data, ramsey_fringe_norm_from_avg])
+    #     ]
 
-        # Optional pointwise Spin Echo normalization if ms0 is a tau-dependent bright reference
-        with np.errstate(divide='ignore', invalid='ignore'):
-            spin_echo_pointwise_norm_from_avg = np.where(
-                (ms0_mean - I_dark) != 0,
-                (I_tau - I_dark) / (ms0_mean - I_dark),
-                np.nan
-            )
+    #     # Spin Echo normalization:
+    #     # C(tau) = (I(tau) - I_dark) / (I_bright - I_dark)
+    #     I_dark = np.nanpercentile(ms1_mean, 5)
+    #     I_bright = np.nanpercentile(ms0_mean, 95)
 
-        sink.datasets['spin_echo_pointwise_norm_from_avg'] = [
-            np.stack([x_axis_data, spin_echo_pointwise_norm_from_avg])
-        ]
+    #     denom = I_bright - I_dark
+
+    #     if np.isfinite(denom) and denom != 0:
+    #         spin_echo_bright_dark_norm_from_avg = (I_tau - I_dark) / denom
+    #     else:
+    #         spin_echo_bright_dark_norm_from_avg = np.full_like(I_tau, np.nan, dtype=float)
+
+    #     sink.datasets['spin_echo_bright_dark_norm_from_avg'] = [
+    #         np.stack([x_axis_data, spin_echo_bright_dark_norm_from_avg])
+    #     ]
+
+    #     # Optional pointwise Spin Echo normalization if ms0 is a tau-dependent bright reference
+    #     with np.errstate(divide='ignore', invalid='ignore'):
+    #         spin_echo_pointwise_norm_from_avg = np.where(
+    #             (ms0_mean - I_dark) != 0,
+    #             (I_tau - I_dark) / (ms0_mean - I_dark),
+    #             np.nan
+    #         )
+
+    #     sink.datasets['spin_echo_pointwise_norm_from_avg'] = [
+    #         np.stack([x_axis_data, spin_echo_pointwise_norm_from_avg])
+    #     ]
 
 class FlexLinePlotWidgetWithT2(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""
@@ -384,24 +541,32 @@ class FlexLinePlotWidgetWithT2(FlexLinePlotWidget):
 
 
         # create some plots that not frequently used, so we hide them
-        """ self.add_plot('ms1_latest',     series='ms1',   scan_i='-1',   scan_j='',  processing='Average')
-        self.add_plot('ms1_first',      series='ms1',   scan_i='0',    scan_j='1', processing='Average')
-        self.add_plot('ms1_latest_10',  series='ms1',   scan_i='-10',  scan_j='',  processing='Average')
-        self.hide_plot('ms1_latest')
-        self.hide_plot('ms1_first')
-        self.hide_plot('ms1_latest_10')
+        self.add_plot(
+            'sig_latest',
+            series='signal',
+            scan_i='-1',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('sig_latest')
 
-        self.add_plot('ms0_latest',      series='ms0',   scan_i='-1',   scan_j='',  processing='Average')
-        self.hide_plot('ms0_latest')
-        
-        self.add_plot('diff_latest',    series='diff',  scan_i='-1',    scan_j='',  processing='Average')
-        self.hide_plot('diff_latest')
-        
-        self.add_plot('contrast_latest',    series='contrast',  scan_i='-1',    scan_j='',  processing='Average')
-        self.hide_plot('contrast_latest') """
-        # manually set the XY range
-        #self.line_plot.plot_item().setXRange(3.0, 4.0)
-        #self.line_plot.plot_item().setYRange(-3000, 4500)
+        self.add_plot(
+            'bg_latest',
+            series='background',
+            scan_i='-1',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('bg_latest')
+
+        self.add_plot(
+            'contrast_latest',
+            series='contrast',
+            scan_i='-1',
+            scan_j='',
+            processing='Average'
+        )
+        self.hide_plot('contrast_latest')
 
         # retrieve legend object
         legend = self.line_plot.plot_widget.addLegend()

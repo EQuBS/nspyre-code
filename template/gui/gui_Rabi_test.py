@@ -1,11 +1,6 @@
 """
-GUI elements for Rabi
-Tian-Xing Zheng, Sept.2023
-"""
-
-"""
 To be adapted and used by EQuBS Lab.
-Rolando A. Fimbres Grijalva, Aug. 20252
+Rolando A. Fimbres Grijalva, 6/4/2026
 """
 
 import numpy as np
@@ -25,8 +20,18 @@ from . import spin_measurements as sm
 class RabiWidget(ExperimentWidget):
     def __init__(self):
         self.rabi_type_combo = QtWidgets.QComboBox()
-        self.rabi_type_combo.addItems(['Constant-T', 'Incremental-T']) #, 'P_list', 'CW_list', 'P2_list'])
-        self.rabi_type_combo.setCurrentText('Constant-T')
+        self.rabi_type_combo.addItems(['Test-1', 'Test-2']) #, 'P_list', 'CW_list', 'P2_list'])
+        self.rabi_type_combo.setCurrentText('Test-2')
+
+        step_size = 8e-9
+
+        def force_8ns_multiple(val):
+            """Enforces that manual text inputs are rounded to the nearest 8 ns."""
+            # Round to the nearest multiple of 8 ns
+            rounded_val = round(val / step_size) * step_size
+            # Enforce your 0 ns minimum bound
+            return max(0e-9, rounded_val)
+
         params_config = {
             'runs': {
                 'display_text': 'Runs (per pt.): ',
@@ -70,12 +75,15 @@ class RabiWidget(ExperimentWidget):
             'start': {
                 'display_text': 'Start MW Pulse Time: ',
                 'widget': SpinBox(
-                    value = 10e-9,
+                    value = 8e-9,
                     suffix = 's',
                     siPrefix = True,
-                    bounds = (0e-9, None),
-                    dec = True,
+                    bounds = (8e-9, None),
+                    #dec = True,
+                    step = step_size,
+                    minStep = step_size,
                 ),
+                'constraint': 'force_8ns_multiple',
             },
 
             'stop': {
@@ -84,9 +92,12 @@ class RabiWidget(ExperimentWidget):
                     value = 300e-9,
                     suffix = 's',
                     siPrefix = True,
-                    bounds = (2e-9, None),
+                    bounds = (8e-9, None),
                     dec = True,
+                    step = step_size,
+                    minStep = step_size,
                 ),
+                'constraint': 'force_8ns_multiple',
             },
 
             'num_pts': {
@@ -116,7 +127,11 @@ class RabiWidget(ExperimentWidget):
                     suffix = 's',
                     siPrefix = True,
                     bounds = (5e-7, None),
+                    dec = True,
+                    step = step_size,
+                    minStep = step_size,
                 ),
+                'constraint': 'force_8ns_multiple',
             },
 
             'read_time': {
@@ -126,7 +141,11 @@ class RabiWidget(ExperimentWidget):
                     suffix = 's',
                     siPrefix = True,
                     bounds = (10e-9, None),
+                    dec = True,
+                    step = step_size,
+                    minStep = step_size,
                 ),
+                'constraint': 'force_8ns_multiple',
             },
 
             'wait_time': {
@@ -136,7 +155,11 @@ class RabiWidget(ExperimentWidget):
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
+                    dec = True,
+                    step = step_size,
+                    minStep = step_size,
                 ),
+                'constraint': 'force_8ns_multiple',
             },
 
             'read_wait': {
@@ -146,7 +169,11 @@ class RabiWidget(ExperimentWidget):
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
+                    dec = True,
+                    step = step_size,
+                    minStep = step_size,
                 ),
+                'constraint': 'force_8ns_multiple',
             },
 
             'switch_delay': {
@@ -156,7 +183,11 @@ class RabiWidget(ExperimentWidget):
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
+                    dec = True,
+                    step = step_size,
+                    minStep = step_size,
                 ),
+                'constraint': 'force_8ns_multiple',
             },
 
             'seq_gap': {
@@ -166,7 +197,11 @@ class RabiWidget(ExperimentWidget):
                     suffix = 's',
                     siPrefix = True,
                     bounds = (0, None),
+                    dec = True,
+                    step = step_size,
+                    minStep = step_size,
                 ),
+                'constraint': 'force_8ns_multiple',
             },
 
             'pi_xy': {
@@ -179,10 +214,18 @@ class RabiWidget(ExperimentWidget):
             },
         }
 
+        # Then apply in a loop
+        for param_name, param_dict in params_config.items():
+            if param_dict.get('constraint') == 'force_8ns_multiple':
+                widget = param_dict['widget']
+                widget.valueChanged.connect(
+                    lambda val, w=widget: w.setValue(force_8ns_multiple(val))
+                )
+
         super().__init__(params_config, 
                         sm,
                         'SpinMeasurements',
-                        'rabi_run_R3',
+                        'rabi_run_Test',
                         title='Rabi')
 
 def process_Rabi_data(sink: DataSink):

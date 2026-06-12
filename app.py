@@ -42,10 +42,11 @@ def main():
     import template.gui.gui_dlnsec
     import template.gui.gui_2D_Scan_mm
     import template.gui.gui_2D_Scan_hardware
-    import template.gui.gui_Nano3_mm
+    import template.gui.gui_TRSDF
     import template.gui.gui_Nano3
     import template.gui.gui_ODMR
     import template.gui.gui_Rabi
+    import template.gui.gui_Rabi_test
     import template.gui.gui_T1
     import template.gui.gui_T2
     import template.gui.gui_Calibrate
@@ -128,6 +129,12 @@ def main():
                     stretch=(1, 1),
                 ),
 
+                "TRSDF": MainWidgetItem(
+                    template.gui.gui_TRSDF,
+                    "TRSDF_Widget",
+                    stretch=(1, 1),
+                ),
+
                 "ODMR": MainWidgetItem(
                     template.gui.gui_ODMR,
                     "ODMR_Widget",
@@ -139,6 +146,13 @@ def main():
                     "RabiWidget",
                     stretch=(1, 1),
                 ),
+
+                "Rabi-test": MainWidgetItem(
+                    template.gui.gui_Rabi_test,
+                    "RabiWidget",
+                    stretch=(1, 1),
+                ),
+
                 "Plots": {
                     "FlexLinePlotDemo": MainWidgetItem(
                         template.gui.elements,
@@ -188,6 +202,11 @@ def main():
                     "T2Plot": MainWidgetItem(
                         template.gui.gui_T2,
                         "FlexLinePlotWidgetWithT2",
+                        stretch=(100, 100),
+                    ),
+                    "TRSDFPlot": MainWidgetItem(
+                        template.gui.gui_TRSDF,
+                        "FlexLinePlotWidgetWithTRSDF",
                         stretch=(100, 100),
                     ),
                 },
